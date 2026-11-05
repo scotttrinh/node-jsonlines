@@ -1,1 +1,7 @@
 node_modules/
+dist/
+coverage/
+*.tgz
+bench/results.local.json
+*.cpuprofile
+*.heapprofile

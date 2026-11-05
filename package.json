@@ -1,19 +1,46 @@
 {
   "name": "jsonlines",
-  "version": "0.1.1",
+  "version": "1.0.0-alpha.0",
+  "description": "Fast, low-memory JSON Lines streams for modern Node.js",
   "license": "MIT",
   "author": "Linus Unnebäck <linus@folkdatorn.se>",
-  "main": "index.js",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "sideEffects": false,
   "repository": {
     "type": "git",
-    "url": "http://github.com/LinusU/node-jsonlines.git"
+    "url": "https://github.com/scotttrinh/node-jsonlines.git"
   },
   "scripts": {
-    "test": "standard && mocha"
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && node --test test/*.test.js",
+    "test:coverage": "npm run build && node --experimental-test-coverage --test test/*.test.js",
+    "check": "npm run typecheck && npm run format:check && npm test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "bench": "npm run build && node bench/run.js",
+    "bench:quick": "npm run bench -- --quick",
+    "prepack": "npm run build"
   },
   "devDependencies": {
-    "concat-stream": "^1.5.0",
-    "mocha": "^2.2.5",
-    "standard": "^5.0.2"
+    "@types/node": "^22.20.0",
+    "jsonlines-legacy": "npm:jsonlines@0.1.1",
+    "prettier": "^3.9.0",
+    "typescript": "7.0.2"
   }
 }
