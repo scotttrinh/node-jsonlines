@@ -1,0 +1,443 @@
+{
+  "date": "2026-11-05T21:43:30.916Z",
+  "repetitions": 3,
+  "runs": [
+    {
+      "repeat": 0,
+      "variant": "original",
+      "node": "v22.23.4",
+      "modulePath": "/tmp/jsonlines-parser-current/dist/index.js",
+      "scenario": "fragmented-record",
+      "baselineRssMiB": 59.61328125,
+      "peakRssMiB": 63.5078125,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 63.18359375
+    },
+    {
+      "repeat": 0,
+      "variant": "minimal",
+      "node": "v22.23.4",
+      "modulePath": "/tmp/jsonlines-parser-simple/dist/index.js",
+      "scenario": "fragmented-record",
+      "baselineRssMiB": 112.8984375,
+      "peakRssMiB": 122.93359375,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 122.41015625
+    },
+    {
+      "repeat": 0,
+      "variant": "window-reuse",
+      "node": "v22.23.4",
+      "modulePath": "/tmp/jsonlines-parser-window-reuse/dist/index.js",
+      "scenario": "fragmented-record",
+      "baselineRssMiB": 108.8828125,
+      "peakRssMiB": 118.47265625,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 118.015625
+    },
+    {
+      "repeat": 1,
+      "variant": "minimal",
+      "node": "v22.23.4",
+      "modulePath": "/tmp/jsonlines-parser-simple/dist/index.js",
+      "scenario": "fragmented-record",
+      "baselineRssMiB": 113.2421875,
+      "peakRssMiB": 123.48046875,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 122.99609375
+    },
+    {
+      "repeat": 1,
+      "variant": "window-reuse",
+      "node": "v22.23.4",
+      "modulePath": "/tmp/jsonlines-parser-window-reuse/dist/index.js",
+      "scenario": "fragmented-record",
+      "baselineRssMiB": 108.90234375,
+      "peakRssMiB": 119.0859375,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 118.51171875
+    },
+    {
+      "repeat": 1,
+      "variant": "original",
+      "node": "v22.23.4",
+      "modulePath": "/tmp/jsonlines-parser-current/dist/index.js",
+      "scenario": "fragmented-record",
+      "baselineRssMiB": 59.67578125,
+      "peakRssMiB": 63.6875,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 63.49609375
+    },
+    {
+      "repeat": 2,
+      "variant": "window-reuse",
+      "node": "v22.23.4",
+      "modulePath": "/tmp/jsonlines-parser-window-reuse/dist/index.js",
+      "scenario": "fragmented-record",
+      "baselineRssMiB": 108.80859375,
+      "peakRssMiB": 118.2109375,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 117.90625
+    },
+    {
+      "repeat": 2,
+      "variant": "original",
+      "node": "v22.23.4",
+      "modulePath": "/tmp/jsonlines-parser-current/dist/index.js",
+      "scenario": "fragmented-record",
+      "baselineRssMiB": 59.484375,
+      "peakRssMiB": 63.51171875,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 63.1796875
+    },
+    {
+      "repeat": 2,
+      "variant": "minimal",
+      "node": "v22.23.4",
+      "modulePath": "/tmp/jsonlines-parser-simple/dist/index.js",
+      "scenario": "fragmented-record",
+      "baselineRssMiB": 111.4765625,
+      "peakRssMiB": 121.5390625,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 121.2109375
+    },
+    {
+      "repeat": 0,
+      "variant": "original",
+      "node": "v22.23.4",
+      "modulePath": "/tmp/jsonlines-parser-current/dist/index.js",
+      "scenario": "retained-tail",
+      "baselineRssMiB": 55.2890625,
+      "peakRssMiB": 88.3203125,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 88.3203125,
+      "retainedArrayBuffersMiB": 0.01780223846435547
+    },
+    {
+      "repeat": 0,
+      "variant": "minimal",
+      "node": "v22.23.4",
+      "modulePath": "/tmp/jsonlines-parser-simple/dist/index.js",
+      "scenario": "retained-tail",
+      "baselineRssMiB": 87.5703125,
+      "peakRssMiB": 88.640625,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 88.25,
+      "retainedArrayBuffersMiB": 32.009989738464355
+    },
+    {
+      "repeat": 0,
+      "variant": "window-reuse",
+      "node": "v22.23.4",
+      "modulePath": "/tmp/jsonlines-parser-window-reuse/dist/index.js",
+      "scenario": "retained-tail",
+      "baselineRssMiB": 87.0859375,
+      "peakRssMiB": 88.16796875,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 88.16796875,
+      "retainedArrayBuffersMiB": 32.009989738464355
+    },
+    {
+      "repeat": 1,
+      "variant": "minimal",
+      "node": "v22.23.4",
+      "modulePath": "/tmp/jsonlines-parser-simple/dist/index.js",
+      "scenario": "retained-tail",
+      "baselineRssMiB": 85.51953125,
+      "peakRssMiB": 88.26953125,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 88.26953125,
+      "retainedArrayBuffersMiB": 32.009989738464355
+    },
+    {
+      "repeat": 1,
+      "variant": "window-reuse",
+      "node": "v22.23.4",
+      "modulePath": "/tmp/jsonlines-parser-window-reuse/dist/index.js",
+      "scenario": "retained-tail",
+      "baselineRssMiB": 85.203125,
+      "peakRssMiB": 88.078125,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 88.078125,
+      "retainedArrayBuffersMiB": 32.009989738464355
+    },
+    {
+      "repeat": 1,
+      "variant": "original",
+      "node": "v22.23.4",
+      "modulePath": "/tmp/jsonlines-parser-current/dist/index.js",
+      "scenario": "retained-tail",
+      "baselineRssMiB": 54.9375,
+      "peakRssMiB": 88.09375,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 88.09375,
+      "retainedArrayBuffersMiB": 0.01780223846435547
+    },
+    {
+      "repeat": 2,
+      "variant": "window-reuse",
+      "node": "v22.23.4",
+      "modulePath": "/tmp/jsonlines-parser-window-reuse/dist/index.js",
+      "scenario": "retained-tail",
+      "baselineRssMiB": 87.15234375,
+      "peakRssMiB": 88.5,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 88.5,
+      "retainedArrayBuffersMiB": 32.009989738464355
+    },
+    {
+      "repeat": 2,
+      "variant": "original",
+      "node": "v22.23.4",
+      "modulePath": "/tmp/jsonlines-parser-current/dist/index.js",
+      "scenario": "retained-tail",
+      "baselineRssMiB": 55.16015625,
+      "peakRssMiB": 88.2890625,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 88.2890625,
+      "retainedArrayBuffersMiB": 0.01780223846435547
+    },
+    {
+      "repeat": 2,
+      "variant": "minimal",
+      "node": "v22.23.4",
+      "modulePath": "/tmp/jsonlines-parser-simple/dist/index.js",
+      "scenario": "retained-tail",
+      "baselineRssMiB": 87.1875,
+      "peakRssMiB": 87.51171875,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 87.4296875,
+      "retainedArrayBuffersMiB": 32.009989738464355
+    },
+    {
+      "repeat": 0,
+      "variant": "original",
+      "node": "v26.13.0",
+      "modulePath": "/tmp/jsonlines-parser-current/dist/index.js",
+      "scenario": "fragmented-record",
+      "baselineRssMiB": 64.5703125,
+      "peakRssMiB": 67.5859375,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 67.21875
+    },
+    {
+      "repeat": 0,
+      "variant": "minimal",
+      "node": "v26.13.0",
+      "modulePath": "/tmp/jsonlines-parser-simple/dist/index.js",
+      "scenario": "fragmented-record",
+      "baselineRssMiB": 134.66796875,
+      "peakRssMiB": 154.7578125,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 154.41796875
+    },
+    {
+      "repeat": 0,
+      "variant": "window-reuse",
+      "node": "v26.13.0",
+      "modulePath": "/tmp/jsonlines-parser-window-reuse/dist/index.js",
+      "scenario": "fragmented-record",
+      "baselineRssMiB": 113.27734375,
+      "peakRssMiB": 151.3203125,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 150.96484375
+    },
+    {
+      "repeat": 1,
+      "variant": "minimal",
+      "node": "v26.13.0",
+      "modulePath": "/tmp/jsonlines-parser-simple/dist/index.js",
+      "scenario": "fragmented-record",
+      "baselineRssMiB": 131.48828125,
+      "peakRssMiB": 154.1015625,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 153.61328125
+    },
+    {
+      "repeat": 1,
+      "variant": "window-reuse",
+      "node": "v26.13.0",
+      "modulePath": "/tmp/jsonlines-parser-window-reuse/dist/index.js",
+      "scenario": "fragmented-record",
+      "baselineRssMiB": 113.4296875,
+      "peakRssMiB": 150.828125,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 150.4921875
+    },
+    {
+      "repeat": 1,
+      "variant": "original",
+      "node": "v26.13.0",
+      "modulePath": "/tmp/jsonlines-parser-current/dist/index.js",
+      "scenario": "fragmented-record",
+      "baselineRssMiB": 64.02734375,
+      "peakRssMiB": 67.3671875,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 67.15234375
+    },
+    {
+      "repeat": 2,
+      "variant": "window-reuse",
+      "node": "v26.13.0",
+      "modulePath": "/tmp/jsonlines-parser-window-reuse/dist/index.js",
+      "scenario": "fragmented-record",
+      "baselineRssMiB": 113.04296875,
+      "peakRssMiB": 151.0546875,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 150.60546875
+    },
+    {
+      "repeat": 2,
+      "variant": "original",
+      "node": "v26.13.0",
+      "modulePath": "/tmp/jsonlines-parser-current/dist/index.js",
+      "scenario": "fragmented-record",
+      "baselineRssMiB": 64.3359375,
+      "peakRssMiB": 67.91015625,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 67.5859375
+    },
+    {
+      "repeat": 2,
+      "variant": "minimal",
+      "node": "v26.13.0",
+      "modulePath": "/tmp/jsonlines-parser-simple/dist/index.js",
+      "scenario": "fragmented-record",
+      "baselineRssMiB": 131.4765625,
+      "peakRssMiB": 153.578125,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 153.19921875
+    },
+    {
+      "repeat": 0,
+      "variant": "original",
+      "node": "v26.13.0",
+      "modulePath": "/tmp/jsonlines-parser-current/dist/index.js",
+      "scenario": "retained-tail",
+      "baselineRssMiB": 58.43359375,
+      "peakRssMiB": 91.30859375,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 91.30859375,
+      "retainedArrayBuffersMiB": 0.1315145492553711
+    },
+    {
+      "repeat": 0,
+      "variant": "minimal",
+      "node": "v26.13.0",
+      "modulePath": "/tmp/jsonlines-parser-simple/dist/index.js",
+      "scenario": "retained-tail",
+      "baselineRssMiB": 91.17578125,
+      "peakRssMiB": 91.92578125,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 91.75390625,
+      "retainedArrayBuffersMiB": 32.13151454925537
+    },
+    {
+      "repeat": 0,
+      "variant": "window-reuse",
+      "node": "v26.13.0",
+      "modulePath": "/tmp/jsonlines-parser-window-reuse/dist/index.js",
+      "scenario": "retained-tail",
+      "baselineRssMiB": 88.6328125,
+      "peakRssMiB": 91.3828125,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 91.3828125,
+      "retainedArrayBuffersMiB": 32.13151454925537
+    },
+    {
+      "repeat": 1,
+      "variant": "minimal",
+      "node": "v26.13.0",
+      "modulePath": "/tmp/jsonlines-parser-simple/dist/index.js",
+      "scenario": "retained-tail",
+      "baselineRssMiB": 91.0234375,
+      "peakRssMiB": 92.203125,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 91.74609375,
+      "retainedArrayBuffersMiB": 32.13151454925537
+    },
+    {
+      "repeat": 1,
+      "variant": "window-reuse",
+      "node": "v26.13.0",
+      "modulePath": "/tmp/jsonlines-parser-window-reuse/dist/index.js",
+      "scenario": "retained-tail",
+      "baselineRssMiB": 90.5078125,
+      "peakRssMiB": 91.37109375,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 91.37109375,
+      "retainedArrayBuffersMiB": 32.13151454925537
+    },
+    {
+      "repeat": 1,
+      "variant": "original",
+      "node": "v26.13.0",
+      "modulePath": "/tmp/jsonlines-parser-current/dist/index.js",
+      "scenario": "retained-tail",
+      "baselineRssMiB": 58.484375,
+      "peakRssMiB": 91.234375,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 91.234375,
+      "retainedArrayBuffersMiB": 0.1315145492553711
+    },
+    {
+      "repeat": 2,
+      "variant": "window-reuse",
+      "node": "v26.13.0",
+      "modulePath": "/tmp/jsonlines-parser-window-reuse/dist/index.js",
+      "scenario": "retained-tail",
+      "baselineRssMiB": 90.73046875,
+      "peakRssMiB": 91.3359375,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 91.3359375,
+      "retainedArrayBuffersMiB": 32.13151454925537
+    },
+    {
+      "repeat": 2,
+      "variant": "original",
+      "node": "v26.13.0",
+      "modulePath": "/tmp/jsonlines-parser-current/dist/index.js",
+      "scenario": "retained-tail",
+      "baselineRssMiB": 58.59375,
+      "peakRssMiB": 91.21875,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 91.21875,
+      "retainedArrayBuffersMiB": 0.1315145492553711
+    },
+    {
+      "repeat": 2,
+      "variant": "minimal",
+      "node": "v26.13.0",
+      "modulePath": "/tmp/jsonlines-parser-simple/dist/index.js",
+      "scenario": "retained-tail",
+      "baselineRssMiB": 89.7734375,
+      "peakRssMiB": 92.4375,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 92.3984375,
+      "retainedArrayBuffersMiB": 32.13151454925537
+    }
+  ],
+  "schemaVersion": 1,
+  "complete": true,
+  "variants": {
+    "original": {
+      "commit": "a76f8d8752fb7ad8caa1eb121dc0ae522f5e8763",
+      "linesSha256": "dad06b6fa9e3eade17133f51f7f8bf12d45926a24a5f24319af1804478debe59"
+    },
+    "minimal": {
+      "commit": "7884ce26366b1b9f0db33b319a556b0796013e55",
+      "linesSha256": "6826890f9e056181504754f059b8dae9e0466816d9e6ca08ec9c6bb82c57d217"
+    },
+    "window-reuse": {
+      "commit": "f0c6cbde21f6349259725d4d2995083cabd05469",
+      "linesSha256": "eeaabfc5efd94e809a76a712dddffcc7c601c1335f33278a38c6ae401c439f48"
+    }
+  },
+  "method": {
+    "worker": "bench/parser-memory.js",
+    "order": "Rotate the starting variant between repetitions; workers run sequentially.",
+    "peak": "VmHWM includes fixture construction and preflight.",
+    "fragmented-record": "One 256 KiB string record; one-byte views generated lazily.",
+    "retained-tail": "32 MiB input of empty lines and one unfinished quote; live ArrayBuffer usage after two GCs while parser remains open."
+  }
+}

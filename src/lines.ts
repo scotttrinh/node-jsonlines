@@ -3,7 +3,7 @@ export class Lines {
   line = 0
   private chunk: Buffer | undefined
   private offset = 0
-  private parts: Buffer[] = []
+  private scratch: Buffer | undefined
   private length = 0
   private text = ''
   private textOffset = 0
@@ -71,7 +71,7 @@ export class Lines {
 
   clear(): void {
     this.chunk = undefined
-    this.parts = []
+    this.scratch = undefined
     this.length = 0
     this.text = ''
   }
@@ -96,18 +96,30 @@ export class Lines {
   }
 
   private append(chunk: Buffer, start: number, end: number): void {
-    if (start === end) return
-    this.checkLength(this.length + end - start)
-    this.parts.push(
-      start === 0 && end === chunk.length ? chunk : chunk.subarray(start, end),
-    )
-    this.length += end - start
+    const length = end - start
+    if (length === 0) return
+    const required = this.length + length
+    this.checkLength(required)
+    if (this.scratch === undefined || this.scratch.length < required) {
+      // One growing buffer avoids retaining a view per tiny fragment or
+      // pinning a large source allocation for a small unfinished tail.
+      const capacity = Math.min(
+        this.maxLineBytes,
+        Math.max(required, (this.scratch?.length ?? 512) * 2),
+      )
+      const next = Buffer.allocUnsafe(capacity)
+      this.scratch?.copy(next, 0, 0, this.length)
+      this.scratch = next
+    }
+    chunk.copy(this.scratch, this.length, start, end)
+    this.length = required
   }
 
   private takePartial(): string {
-    const result = Buffer.concat(this.parts, this.length).toString('utf8')
-    this.parts = []
+    const result = this.scratch!.toString('utf8', 0, this.length)
     this.length = 0
+    // Don't retain an unusually large allocation for the rest of the stream.
+    if (this.scratch!.length > 64 * 1024) this.scratch = undefined
     return result
   }
 }

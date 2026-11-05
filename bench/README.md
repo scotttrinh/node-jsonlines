@@ -166,7 +166,8 @@ Ratios are geometric means of paired legacy/modern mean latencies, with 95%
 per-scenario intervals. These new corpus/batch sizes supersede the one-shot
 measurements; compare implementations within each row, not across protocols.
 The stringifier follow-up below supersedes these initial serialization results;
-the parser implementation is unchanged.
+the parser implementation at that point is unchanged. See the parser ablation
+follow-up below for the simplification comparison.
 
 ### Node 22.23.4
 
@@ -289,12 +290,172 @@ Fresh [backpressure probes](results-memory-backpressure.json) supersede the
 initial rusage-based parser RSS readings. They still queue 32 objects versus
 299,985 for legacy. Corrected peaks are 101.6 / 227.1 MiB on Node 22 and
 107.6 / 261.6 MiB on Node 26 (modern / legacy). Fixture/preflight allocation is
-included. The parser code and its earlier timing results are unchanged, including
+included. Those probes use the original modern parser and its earlier timings, including
 the Node 26 slow-consumer throughput regression.
 
 Native line splitting, StringDecoder framing and a direct Duplex parser were
 screened without consistent gains across workloads. Their parser changes were
 discarded. The retained runtime change is the simpler bounded-batch stringifier.
+
+## Parser simplification and ablation
+
+The minimal parser at `7884ce2` keeps byte-level newline framing, one final
+`Buffer.concat()` for a fragmented record, original-byte limits, physical line
+numbers, split UTF-8 correctness and the existing Transform backpressure handling.
+It removes both the growing scratch buffer and the decoded-text window. All 26
+behavioral/tooling tests pass, including a new malformed-UTF-8 byte-limit check.
+This is a correctness-preserving baseline, rather than a parser that gains
+simplicity by dropping limits or expanding entire input chunks into objects.
+
+The original parser is `a76f8d8`. Its confirmation comparison with that minimal
+baseline uses seven fresh-process pairs per scenario and Node version, three
+seconds and 50 iterations per worker, up to 12 warm-up windows and a new corpus
+seed of 60301. The 5% threshold and convergence rule are unchanged. Shorter,
+three-pair screening runs are excluded from these confirmation artifacts.
+
+The Unicode fixture ends every chunk at LF, so it never uses fragment
+accumulation and isolates the decoded-text window. Conversely, every record in
+the seven-byte and fragmented-large-record fixtures spans chunks, so they never
+use the decoded-text window and isolate the accumulation strategy. The other
+fixtures exercise the combined paths. Both parsers retain backpressure; the
+separate memory diagnostics compare their implementation overhead, rather than
+comparing a bounded parser with the unbounded legacy implementation.
+
+### Confirmation results
+
+These ratios compare **original modern / minimal modern**, rather than legacy.
+The JSON schema calls the minimal reference `legacy`; its baseline metadata
+identifies the actual module. MiB/s is the process mean ± sample SD. All **168
+timing workers and 79,280 measured iterations** are retained. Three workers
+failed warm-up convergence: Node 22 large records, Node 26 Unicode, and Node 26
+limited lines. Their rows remain qualified, regardless of their intervals.
+
+| Node | Scenario           | Original MiB/s ± SD | Minimal MiB/s ± SD |         Ratio [95% CI] | Decision           |
+| ---- | ------------------ | ------------------: | -----------------: | ---------------------: | ------------------ |
+| 22   | parse-small        |         126.8 ± 3.3 |        117.8 ± 4.7 | 1.077 [1.0276, 1.1277] | Inconclusive at 5% |
+| 22   | parse-unicode      |          94.3 ± 4.8 |         79.4 ± 3.2 | 1.186 [1.1485, 1.2252] | ≥5% gain supported |
+| 22   | parse-limited      |         123.7 ± 6.2 |        120.6 ± 3.6 | 1.025 [0.9796, 1.0724] | Inconclusive at 5% |
+| 22   | parse-fragmented   |          19.6 ± 1.0 |         14.7 ± 0.3 | 1.331 [1.2678, 1.3972] | ≥5% gain supported |
+| 22   | parse-large-record |        431.6 ± 20.9 |       439.2 ± 31.7 | 0.984 [0.9051, 1.0697] | Warm-up warning    |
+| 22   | parse-backpressure |          89.9 ± 2.1 |         77.1 ± 1.5 | 1.166 [1.1318, 1.2006] | ≥5% gain supported |
+| 26   | parse-small        |         144.5 ± 5.1 |        115.9 ± 7.4 | 1.248 [1.1488, 1.3560] | ≥5% gain supported |
+| 26   | parse-unicode      |        127.7 ± 15.7 |        102.6 ± 4.3 | 1.236 [1.1099, 1.3769] | Warm-up warning    |
+| 26   | parse-limited      |         134.2 ± 6.1 |        116.0 ± 9.9 | 1.160 [1.0756, 1.2502] | Warm-up warning    |
+| 26   | parse-fragmented   |          24.4 ± 1.2 |         20.5 ± 0.8 | 1.187 [1.1616, 1.2132] | ≥5% gain supported |
+| 26   | parse-large-record |        690.3 ± 54.2 |       908.4 ± 22.9 | 0.758 [0.7029, 0.8178] | ≥5% loss supported |
+| 26   | parse-backpressure |         106.7 ± 3.6 |         88.9 ± 4.3 | 1.201 [1.1480, 1.2562] | ≥5% gain supported |
+
+[Node 22 summary](results-parser-original-vs-simple-node22.json) ·
+[Node 22 samples](results-parser-original-vs-simple-node22.samples.json.gz) ·
+[Node 26 summary](results-parser-original-vs-simple-node26.json) ·
+[Node 26 samples](results-parser-original-vs-simple-node26.samples.json.gz)
+
+The window supports about 19% faster Unicode parsing on Node 22 (95% CI +15% to
++23%). The combined parser is about 25% faster on Node 26 small ASCII (+15% to
++36%) and 17–20% faster in the slow-consumer timing case. The scratch buffer
+supports about 33% faster seven-byte fragments on Node 22 (+27% to +40%) and
+19% on Node 26 (+16% to +21%). These effects justify the respective layers for
+those workloads; ordinary-parser improvements over published legacy remain
+subject to the earlier, separate comparison.
+
+There is a clear cost: on Node 26, the minimal accumulator parses 256 KiB records
+split into 1 KiB chunks about **32% faster** (95% CI +22% to +42%). Node 22 does
+not establish a large-record difference. In separate single-pass memory probes,
+original/minimal large-record peaks are 85.8/75.8 MiB on Node 22 and 94.0/79.7 MiB
+on Node 26. The growing buffer is not a universal throughput or RSS improvement.
+Both implementations queue only 32 objects in the backpressure memory case;
+that guarantee belongs to the core stream handling. Its original/minimal peaks
+are 101.6/92.4 MiB on Node 22 and 106.7/97.7 MiB on Node 26. All of these RSS
+values include fixture construction and preflight and are observations, not
+memory confidence intervals.
+
+### Fragment retention diagnostics
+
+A third source revision, `f0c6cbd`, retains the window but borrows fragment buffers
+and concatenates once. Whole input chunks are reused without allocating extra
+views. This tests whether avoiding redundant views resolves the fragment-array
+memory cost. All three parser implementations pass the current 26-test suite.
+
+The [memory artifact](results-parser-memory.json) contains **three fresh workers
+per implementation/scenario/Node version**, 36 workers total, with rotating
+variant order. These diagnostics use [parser-memory.js](parser-memory.js) and
+are separate from timing. Peak RSS includes preflight and fixtures. Ranges show
+all three observations, rather than formal intervals:
+
+| Node | 256 KiB record, one-byte chunks: original peak MiB | Minimal peak MiB | Borrowed-fragment peak MiB |
+| ---- | -------------------------------------------------: | ---------------: | -------------------------: |
+| 22   |                                          63.5–63.7 |      121.5–123.5 |                118.2–119.1 |
+| 26   |                                          67.4–67.9 |      153.6–154.8 |                150.8–151.3 |
+
+Views are generated lazily here. Prebuilding all the views as timing fixtures do
+would retain them for both implementations and conceal the cost of keeping a
+reference per fragment. The growing buffer lets those source views be collected
+as chunks are consumed. Avoiding duplicate views alone does not remove the
+reference-retention cost.
+
+A second probe writes a 32 MiB chunk containing empty lines and one unfinished
+quote, waits for the write callback, drops the source reference, then performs
+two GCs separated by event-loop turns while the parser remains open. Completing
+the quoted string afterwards verifies the retained partial record. This measures
+**live ArrayBuffer allocation**, not peak RSS, because both implementations must
+allocate the input chunk initially:
+
+| Node | Original live ArrayBuffer MiB | Minimal live MiB | Borrowed-fragment live MiB |
+| ---- | ----------------------------: | ---------------: | -------------------------: |
+| 22   |                         0.018 |           32.010 |                     32.010 |
+| 26   |                         0.132 |           32.132 |                     32.132 |
+
+Every repetition gives the displayed allocation to three decimal places. Keeping
+a view of a one-byte tail pins the entire 32 MiB input allocation. The scratch
+buffer copies that tail and releases the source. These are deliberately extreme
+fragmentation/retention probes, not estimates of savings for normal 64 KiB file
+chunks. They explain the allocator's value under the low-memory requirement.
+
+### Retained implementation and reproduction
+
+Retain the decoded window for its supported throughput gains and the growing
+fragment buffer for fine-fragment throughput and bounded fragment retention.
+The parser algorithms remain those of `a76f8d8`; this pass establishes their
+benefits and their large-record cost against a simpler correct implementation.
+The minimal and borrowed-fragment alternatives remain available as source
+commits for reproduction. No throughput claim is made for the borrowed variant;
+its retention measurements already rule it out for the intended memory bounds.
+
+Build the three source revisions in fresh directories:
+
+```sh
+git worktree add --detach /tmp/parser-original a76f8d8
+git worktree add --detach /tmp/parser-minimal 7884ce2
+git worktree add --detach /tmp/parser-borrowed f0c6cbd
+for checkout in /tmp/parser-original /tmp/parser-minimal /tmp/parser-borrowed; do
+  npm --prefix "$checkout" ci
+  npm --prefix "$checkout" run build
+done
+```
+
+From the original checkout (or the retained implementation), reproduce a timing
+comparison with the common runner:
+
+```sh
+node bench/run.js --baseline /tmp/parser-minimal/dist/index.js \
+  --seed 60301 --warmup-windows 12 \
+  --scenario parse-small --scenario parse-unicode --scenario parse-limited \
+  --scenario parse-fragmented --scenario parse-large-record \
+  --scenario parse-backpressure --output bench/results.local.json
+```
+
+Use a Node 26 executable for the other runtime. From the retained checkout,
+each independent memory worker can be reproduced with:
+
+```sh
+node --expose-gc bench/parser-memory.js /tmp/parser-original/dist/index.js fragmented-record
+node --expose-gc bench/parser-memory.js /tmp/parser-minimal/dist/index.js retained-tail
+node --expose-gc bench/parser-memory.js /tmp/parser-borrowed/dist/index.js retained-tail
+```
+
+Run each module/scenario combination three times in fresh workers, rotating
+starting order, to match the memory artifact. It records source commit IDs and
+SHA-256 hashes of each framing implementation.
 
 ## Profiling
 
