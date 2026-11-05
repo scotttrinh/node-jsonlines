@@ -1,10 +1,12 @@
-/** Incremental byte framing; decode only after a complete UTF-8 line arrives. */
+/** Incremental UTF-8 framing. Only a record spanning chunks is copied. */
 export class Lines {
   line = 0
   private chunk: Buffer | undefined
   private offset = 0
   private parts: Buffer[] = []
   private length = 0
+  private text = ''
+  private textOffset = 0
 
   constructor(private readonly maxLineBytes: number) {
     if (
@@ -23,6 +25,12 @@ export class Lines {
   }
 
   next(): string | undefined {
+    if (this.textOffset < this.text.length) return this.nextText()
+    return this.nextChunk()
+  }
+
+  private nextChunk(): string | undefined {
+    this.text = ''
     const chunk = this.chunk
     if (chunk === undefined) return undefined
     const start = this.offset
@@ -34,6 +42,21 @@ export class Lines {
     }
     this.checkLength(this.length + end - start)
     this.offset = end + 1
+    if (this.length === 0 && this.maxLineBytes >= 64 * 1024) {
+      // Decode a bounded window once instead of invoking the UTF-8 decoder for
+      // every small record. Window boundaries always fall on LF, so split
+      // multibyte characters stay in the byte-oriented partial-record path.
+      // Every record in the window fits the byte limit. If the first record
+      // itself exceeds the window, checkLength() above has already checked it.
+      const windowEnd = Math.max(
+        end,
+        chunk.lastIndexOf(10, Math.min(start + 64 * 1024, chunk.length - 1)),
+      )
+      this.text = chunk.toString('utf8', start, windowEnd + 1)
+      this.textOffset = 0
+      this.offset = windowEnd + 1
+      return this.nextText()
+    }
     this.line++
     if (this.length === 0) return chunk.toString('utf8', start, end)
     this.append(chunk, start, end)
@@ -50,6 +73,15 @@ export class Lines {
     this.chunk = undefined
     this.parts = []
     this.length = 0
+    this.text = ''
+  }
+
+  private nextText(): string {
+    const end = this.text.indexOf('\n', this.textOffset)
+    const result = this.text.slice(this.textOffset, end)
+    this.textOffset = end + 1
+    this.line++
+    return result
   }
 
   private checkLength(length: number): void {
@@ -66,7 +98,9 @@ export class Lines {
   private append(chunk: Buffer, start: number, end: number): void {
     if (start === end) return
     this.checkLength(this.length + end - start)
-    this.parts.push(chunk.subarray(start, end))
+    this.parts.push(
+      start === 0 && end === chunk.length ? chunk : chunk.subarray(start, end),
+    )
     this.length += end - start
   }
 
