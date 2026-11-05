@@ -1,119 +1,205 @@
 # Benchmarks
 
-The baseline is the exact published `jsonlines@0.1.1`, installed through the
-`jsonlines-legacy` npm alias. It is a development dependency only. Both
-implementations run on the same Node binary with the same fixtures and sinks.
+Tinybench **6.2.3** measures the Transform API against the exact published
+`jsonlines@0.1.1` (the `jsonlines-legacy` npm alias). Both are development
+dependencies; the library still has zero runtime dependencies.
 
 ```sh
 npm ci
 npm run bench:quick
 npm run bench -- --output bench/results.local.json
-npm run bench -- --scenario parse-backpressure --records 1000000 --samples 7
+npm run bench -- --scenario parse-small --processes 7 --time 5000 --iterations 100
 ```
 
-The default is five independent processes per implementation and scenario, each
-processing 300,000 records after one untimed warmup. Workers run sequentially and
-alternate implementation order. Fixtures are constructed outside the timer and
-reused without storing all input, except for the deliberately large single-chunk
-backpressure case. Every run checks parsed record count and checksum or serialized
-byte count. The generated fixtures contain no `null` records, and the fragmented
-baseline comparison uses ASCII because the old parser corrupts split UTF-8.
-Each scenario repeats a representative record to isolate framing and stream
-costs. This synthetic workload can benefit from engine caches; it does not model
-the full distribution of sizes, shapes or entropy in production data.
+`bench:quick` checks that the workloads run and validate. Its results are labeled
+**smoke-only** and must not be used to claim a speedup. A full default suite takes
+several minutes per Node version. Workers run sequentially, never in competition.
 
-Scenarios cover small ASCII records, Unicode, a 1 MiB line limit, seven-byte chunks,
-256 KiB records fragmented into 1 KiB chunks, one expanding input chunk with a slow consumer, and
-small/Unicode serialization. The large-record scenario uses `ceil(records / 2000)`
-records (at least eight) to keep its total byte volume comparable. Byte sources,
-byte sinks, object sources and object sinks use the appropriate stream modes for
-both implementations; the old stringifier's strings are encoded by the byte sink.
+## Warm-up and measurement
 
-The runner reports median MiB/s and records/s, timing ranges, process peak RSS,
-and maximum observed queued objects in the slow-consumer case. The JSON artifact
-also includes every sample, CPU time, post-warmup RSS, Node/V8 versions, OS and CPU.
-RSS is **whole-process peak**, including imports, fixtures, warmup and allocator
-retention, rather than a claim about live allocations. Explicit GC runs between
-warmup and measurement, outside the timer. A slow sink samples the parser and
-sink queues together; ordinary throughput cases do not poll their queues.
+Each implementation/scenario gets **seven fresh processes**, organized into
+pairs with the same corpus seed. Implementation order alternates between pairs.
+Fixtures are built outside the timer. A correctness preflight runs once, then GC
+runs before warm-up. There is no forced GC between warm-up and measurement or
+between measured iterations; normal allocation and collection costs are included.
 
-Small samples and shared runners can vary substantially. Compare distributions
-and repeat on deployment hardware before drawing conclusions. There are no CI
-performance thresholds; a manually dispatched CI job uploads the raw benchmark
-artifact. These benchmarks measure the Transform API; async iterable performance
-has a different per-record promise cost and is not included in this comparison.
+Tinybench warms each worker in windows of **at least 500 ms and eight complete
+workloads**. Warm-up requires two consecutive changes in window median latency
+within 5%, so it takes at least three windows (1.5 seconds by default). It stops
+after eight windows if this heuristic does not converge. Every window and its raw
+timings are retained. An unconverged worker makes the comparison inconclusive;
+this is an operational stability check, not proof that all JIT activity stopped.
 
-## Recorded results
+After warm-up, Tinybench measures for **at least three seconds and 50 iterations**,
+using `process.hrtime.bigint()` with concurrency disabled. Each iteration constructs
+fresh streams and runs an entire pipeline, including source/sink work and teardown.
+It processes 10,000 records by default (five 256 KiB records for the large-record
+case). Assertions run in Tinybench's `afterEach` hook, outside the timed body.
+Every iteration checks byte count or record count, ID checksum and text length.
 
-Recorded on 2026-11-05, Linux x64, Intel Xeon 2.90 GHz, four logical CPUs, with
-five samples per implementation and 300,000 records (150 large records).
-Raw samples, timing ranges, CPU time and memory measurements are available for
-[Node 22.23.4](results-node22.json) and [Node 26.13.0](results-node26.json).
-Ratios above 1 favor this implementation. These runs used default options,
-except `parse-limited`, which gives the modern parser a 1 MiB byte limit;
-the legacy parser does not implement that option.
+Tinybench exports mean, sample SD, percentiles, relative margin of error and every
+measured latency sample. Rates use bytes or records divided by **mean latency**,
+rather than the biased mean of instantaneous reciprocal rates. Ordered timings
+are also retained to show first-third versus last-third measurement drift.
 
-| Scenario           | Node 22 modern / legacy MiB/s |  Ratio | Node 26 modern / legacy MiB/s |  Ratio |
-| ------------------ | ----------------------------: | -----: | ----------------------------: | -----: |
-| parse-small        |                 146.4 / 156.7 |  0.93× |                 154.0 / 145.7 |  1.06× |
-| parse-unicode      |                 107.4 / 117.1 |  0.92× |                 174.1 / 171.0 |  1.02× |
-| parse-limited      |                 133.0 / 153.9 |  0.86× |                 149.3 / 154.2 |  0.97× |
-| parse-fragmented   |                   15.2 / 11.7 |  1.30× |                   16.5 / 11.0 |  1.50× |
-| parse-large-record |                  370.1 / 16.9 | 21.87× |                  669.3 / 48.1 | 13.91× |
-| parse-backpressure |                   91.3 / 63.5 |  1.44× |                   89.6 / 77.7 |  1.15× |
-| stringify-small    |                  109.0 / 79.3 |  1.37× |                  104.9 / 75.1 |  1.40× |
-| stringify-unicode  |                   92.2 / 87.5 |  1.05× |                 101.5 / 107.8 |  0.94× |
+## Distinguishing an improvement from noise
 
-The slow-consumer case queued at most 32 objects versus 299,985 for the baseline.
-Its median process peak RSS was 97.4 / 189.1 MiB on Node 22 and 97.6 / 227.6 MiB
-on Node 26 (modern / legacy). Large fragmented records used 85.1 / 123.1 MiB and
-87.1 / 169.3 MiB respectively. Small-record memory use is similar. Small-record
-parsing on Node 22 and Unicode serialization on Node 26 can be slower; the
-bounded framing and byte-output paths are a measurable tradeoff, not a universal
-speedup. Several small differences also overlap the sample timing ranges.
+The independent statistical unit is a **process pair**. Hundreds of iterations
+inside one warmed process are not treated as hundreds of independent launches.
+For each pair, the runner takes `log(legacy mean latency / modern mean latency)`.
+It computes a two-sided **95% Student t interval across the seven log ratios**,
+then exponentiates the mean and bounds. A ratio above 1 favors modern. This
+assumes approximately independent, normally distributed process-level log ratios.
+For more than 31 processes, the df=30 critical value conservatively widens the CI.
 
-To reproduce the Node 26 run with that binary:
+The default practical threshold is **5%**, chosen before running:
+
+- **meaningfully-faster**: the entire ratio interval is above 1.05.
+- **meaningfully-slower**: the entire interval is below 0.95.
+- **within-practical-band**: the entire interval lies within [0.95, 1.05].
+- **inconclusive**: the interval cannot establish any of those conclusions.
+- **inconclusive-warmup**: at least one process exhausted its warm-up budget.
+
+A statistically detectable 0.1% gain is therefore not reported as a meaningful
+improvement. An interval can exclude 1 yet remain inconclusive about a 5% effect;
+that is different from saying there is no detectable difference. Verdicts use
+unrounded bounds. Reports show SD/CV between process means, plus Tinybench SD/CV/RME
+within every process. The confidence intervals are **per scenario**, exploratory,
+and not corrected for testing multiple scenarios or Node versions. They are not
+a simultaneous guarantee about the entire suite. Shared-host scheduling, CPU
+frequency changes, process order and GC can still affect results. Prefer the
+recorded intervals and drift diagnostics to tiny differences in point estimates;
+confirm performance on deployment hardware before setting regression thresholds.
+
+## Fixtures and memory diagnostics
+
+Timing fixtures contain a deterministic corpus with distinct IDs, varied lengths,
+ASCII/Unicode text, two object shapes, arrays and nested objects. A process pair
+uses the same seed; subsequent pairs use different seeds. This replaces the old
+benchmark's single identical record. Repeating a finite corpus still permits
+engine caches; it does not model every production dataset.
+
+Scenarios cover 64 KiB input chunks, Unicode chunks ending at LF, a modern-only
+1 MiB line limit, seven-byte ASCII chunks, 256 KiB records fragmented into 1 KiB
+chunks, one expanding chunk with a slow sink, and ASCII/Unicode serialization.
+The baseline cannot enforce line limits. Fragmented comparisons use ASCII because
+the old parser corrupts split UTF-8. Both versions use identical byte/object
+sources and sinks, including UTF-8 encoding of the old stringifier's strings.
+Async iterable promise costs are not measured by these Transform benchmarks.
+
+Memory and queue measurements run in **separate workers**, without importing
+Tinybench or collecting timing samples. They process 300,000 records (150 large
+records) from a bounded pool of at most 1,024 varied objects, or four large objects.
+The backpressure case assembles the requested single large byte chunk. This
+keeps fixture allocation from scaling with the number of decoded objects and
+makes buffering visible. These diagnostics are not used in the speed comparison.
+They run one preflight, GC, then one observed pass. RSS is the **whole-process
+high-water mark**, including fixture construction and preflight, rather than live
+allocation or a memory confidence interval. Queue counts sample the parser and
+sink together only while the slow sink is stalled.
+
+## Artifacts and controls
+
+`--output bench/results.local.json` writes a readable process-level summary and
+`bench/results.local.samples.json.gz` containing the full Tinybench results,
+ordered measurements and warm-up samples. Artifacts are checkpointed between
+workers; only a completed suite has `complete: true`. Compression and writes run
+outside every measurement. CI's manual benchmark job uploads both files.
+
+Useful controls (times are milliseconds):
+
+```sh
+npm run bench -- --scenario stringify-small --records 20000 --time 5000
+npm run bench -- --warmup-time 1000 --warmup-iterations 16 --warmup-windows 10
+npm run bench -- --processes 11 --threshold-percent 5 --memory-records 1000000
+```
+
+To run another installed Node version, build first and run the orchestrator with
+that binary; child workers automatically use the same executable:
 
 ```sh
 npm run build
 npm exec --yes --package=node@26 -- node bench/run.js --output bench/results.local.json
 ```
 
-## Implementation choices
+Raw samples can be read without additional tools:
 
-The parser frames UTF-8 before decoding, preserving characters across chunks.
-The fast path decodes windows ending on LF (normally at most 64 KiB)
-and scans them with `indexOf`, without a whole-chunk `split()` array. A single
-large record can exceed that window. Limits of at least 64 KiB use that same path:
-each contained record fits within the window's byte length, and an oversized first
-record is checked separately. Smaller limits count raw bytes per record before
-decoding, which can cost throughput on small lines.
-Fragmented records use geometrically growing scratch storage, giving linear total
-copying instead of repeatedly concatenating and rescanning an ever-growing string.
-Large scratch allocations are released after their record.
+```js
+import { readFileSync } from 'node:fs'
+import { gunzipSync } from 'node:zlib'
+const raw = JSON.parse(
+  gunzipSync(readFileSync('bench/results.local.samples.json.gz')),
+)
+console.log(raw.runs[0].latency)
+```
 
-The parser stops when `push()` returns false, even midway through one input chunk.
-Memory scales with the input chunk, partial record, decoding window and stream
-water marks, rather than all decoded objects in that chunk. Choose source chunk
-sizes, `maxLineBytes` and stream water marks for the workload.
+## Recorded results
 
-The stringifier encodes directly into geometrically growing byte batches and
-appends LF in the output buffer, avoiding a second string allocation per record.
-Emitted buffers are never reused. Batching reduces allocations and downstream
-writes, with a bounded pending buffer and microtask delivery for sparse writes.
-Set `batchBytes: 0` for synchronous, per-record output.
-Serialization itself uses the platform's `JSON.stringify()`; there is no eval,
-handwritten JSON encoder or schema-specific assumption.
+Recorded on 2026-11-05 on Linux x64, Intel Xeon 2.90 GHz, four logical CPUs.
+There are seven independent process pairs per row. MiB/s columns show the mean
+± sample SD **between processes**, not the smaller error across inner iterations.
+Ratios are geometric means of paired legacy/modern mean latencies, with 95%
+per-scenario intervals. These new corpus/batch sizes supersede the one-shot
+measurements; compare implementations within each row, not across protocols.
+
+### Node 22.23.4
+
+[Summary](results-node22.json) · [Full samples](results-node22.samples.json.gz)
+
+| Scenario           | Modern MiB/s ± SD | Legacy MiB/s ± SD |            Ratio [95% CI] | Decision           |
+| ------------------ | ----------------: | ----------------: | ------------------------: | ------------------ |
+| parse-small        |       116.1 ± 9.4 |      119.7 ± 14.2 |    0.973 [0.8231, 1.1499] | Warm-up warning    |
+| parse-unicode      |       83.4 ± 13.3 |        87.3 ± 9.9 |    0.949 [0.8415, 1.0704] | Inconclusive at 5% |
+| parse-limited      |       116.6 ± 9.7 |      116.6 ± 17.8 |    1.008 [0.8236, 1.2335] | Inconclusive at 5% |
+| parse-fragmented   |        18.3 ± 2.6 |        12.0 ± 0.7 |    1.504 [1.2802, 1.7673] | ≥5% gain supported |
+| parse-large-record |      402.2 ± 22.5 |        15.1 ± 0.9 | 26.571 [24.8581, 28.4009] | Warm-up warning    |
+| parse-backpressure |        81.2 ± 7.6 |        82.3 ± 9.8 |    0.988 [0.8525, 1.1444] | Warm-up warning    |
+| stringify-small    |       127.7 ± 4.3 |        93.8 ± 6.6 |    1.364 [1.2676, 1.4676] | ≥5% gain supported |
+| stringify-unicode  |       73.9 ± 11.6 |        75.0 ± 5.2 |    0.975 [0.8085, 1.1756] | Inconclusive at 5% |
+
+### Node 26.13.0
+
+[Summary](results-node26.json) · [Full samples](results-node26.samples.json.gz)
+
+| Scenario           | Modern MiB/s ± SD | Legacy MiB/s ± SD |            Ratio [95% CI] | Decision           |
+| ------------------ | ----------------: | ----------------: | ------------------------: | ------------------ |
+| parse-small        |       140.4 ± 4.0 |       142.4 ± 7.4 |    0.987 [0.9392, 1.0375] | Inconclusive at 5% |
+| parse-unicode      |      130.7 ± 12.3 |      126.3 ± 10.0 |    1.033 [0.9196, 1.1604] | Inconclusive at 5% |
+| parse-limited      |       134.9 ± 6.5 |       144.2 ± 6.5 |    0.936 [0.8840, 0.9904] | Inconclusive at 5% |
+| parse-fragmented   |        24.3 ± 1.1 |        13.6 ± 0.7 |    1.782 [1.6559, 1.9182] | Warm-up warning    |
+| parse-large-record |      740.8 ± 13.6 |        56.3 ± 2.8 | 13.174 [12.5639, 13.8144] | Warm-up warning    |
+| parse-backpressure |       108.8 ± 4.3 |       121.3 ± 2.2 |    0.897 [0.8549, 0.9402] | ≥5% loss supported |
+| stringify-small    |       114.3 ± 3.8 |       103.6 ± 2.6 |    1.103 [1.0499, 1.1587] | Inconclusive at 5% |
+| stringify-unicode  |        82.7 ± 5.3 |        80.0 ± 3.9 |    1.033 [0.9794, 1.0896] | Inconclusive at 5% |
+
+The Node 22 runs support about 50% faster seven-byte-fragment parsing (95% CI
++28% to +77%) and 36% faster ASCII serialization (+27% to +47%). Ordinary
+small-record parser improvements are not established. Node 26 ASCII serialization
+has a positive effect estimate of about 10%, but its unrounded lower bound falls
+slightly below the predeclared 5% threshold. It remains inconclusive at that bar.
+
+The timed 10,000-record backpressure case is about 10% slower on Node 26
+(95% ratio interval 0.8549–0.9402). The separate 300,000-record memory probe queued
+32 objects versus 299,985; peak RSS was 99.8 / 220.4 MiB on Node 22 and
+105.8 / 257.2 MiB on Node 26 (modern / legacy). These are different batch sizes:
+the memory probe does not establish throughput at 300,000 records.
+
+Six Node 22 workers and two Node 26 workers exhausted the warm-up budget.
+Rows marked **Warm-up warning** retain all samples and their intervals, but are
+not accepted as clean steady-state wins. In particular, the large-record effect
+is substantial while its exact steady-state multiplier remains qualified.
+No outliers or failed convergence checks were silently removed.
 
 ## Profiling
 
-Build once, then isolate a worker from the orchestration overhead:
+Profile a worker rather than the process orchestrator. Profiling changes timing
+and memory overhead, so keep its output separate from the comparative artifacts:
 
 ```sh
 npm run build
-node --expose-gc --cpu-prof bench/worker.js modern parse-small 1000000
-node --expose-gc --heap-prof bench/worker.js modern parse-backpressure 1000000
-node --expose-gc --trace-gc bench/worker.js modern stringify-unicode 1000000
+node --expose-gc --cpu-prof bench/worker.js modern parse-small
+node --expose-gc --heap-prof bench/worker.js modern parse-backpressure
+node --expose-gc --trace-gc bench/worker.js legacy stringify-unicode
 ```
 
 Replace `modern` with `legacy` to profile the baseline. Inspector profiles may be

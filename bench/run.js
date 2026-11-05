@@ -1,29 +1,50 @@
 import { execFile } from 'node:child_process'
 import { writeFile } from 'node:fs/promises'
 import { cpus, platform, arch, release } from 'node:os'
+import { basename } from 'node:path'
 import { parseArgs, promisify } from 'node:util'
+import { fileURLToPath } from 'node:url'
+import { gzip } from 'node:zlib'
+import { configuration } from './config.js'
 import { scenarios } from './fixtures.js'
+import { formatResult, summarize } from './report.js'
 
 const { values } = parseArgs({
   options: {
     quick: { type: 'boolean', default: false },
-    samples: { type: 'string' },
+    processes: { type: 'string' },
     records: { type: 'string' },
+    time: { type: 'string' },
+    iterations: { type: 'string' },
+    'warmup-time': { type: 'string' },
+    'warmup-iterations': { type: 'string' },
+    'warmup-windows': { type: 'string' },
+    'threshold-percent': { type: 'string' },
+    'memory-records': { type: 'string' },
+    seed: { type: 'string' },
     scenario: { type: 'string', multiple: true },
     output: { type: 'string' },
   },
 })
-const samples = Number(values.samples ?? (values.quick ? 2 : 5))
-const records = Number(values.records ?? (values.quick ? 30_000 : 300_000))
-for (const [name, value] of Object.entries({ samples, records })) {
-  if (!Number.isSafeInteger(value) || value < 1)
-    throw new Error(`${name} must be a positive integer`)
-}
+const config = configuration({
+  ...values,
+  warmupTime: values['warmup-time'],
+  warmupIterations: values['warmup-iterations'],
+  warmupWindows: values['warmup-windows'],
+  thresholdPercent: values['threshold-percent'],
+  memoryRecords: values['memory-records'],
+})
 const selected = values.scenario ?? scenarios
-if (selected.some((scenario) => !scenarios.includes(scenario)))
-  throw new Error('Unknown scenario')
+if (
+  !selected.length ||
+  new Set(selected).size !== selected.length ||
+  selected.some((scenario) => !scenarios.includes(scenario))
+)
+  throw new Error('Select distinct known scenarios')
 const execute = promisify(execFile)
-const runs = []
+const compress = promisify(gzip)
+const runs = [],
+  diagnostics = []
 const environment = {
   date: new Date().toISOString(),
   node: process.version,
@@ -32,60 +53,64 @@ const environment = {
   cpu: cpus()[0]?.model,
   logicalCpus: cpus().length,
   legacyVersion: '0.1.1',
-  samples,
-  requestedRecords: records,
+  tinybenchVersion: '6.2.3',
 }
-console.log(JSON.stringify(environment))
+const rawPath = values.output
+  ? values.output.replace(/\.json$/, '') + '.samples.json.gz'
+  : undefined
+async function checkpoint(complete = false) {
+  if (!values.output) return
+  const summary = {
+    schemaVersion: 2,
+    complete,
+    environment,
+    config,
+    comparisons: summarize(runs, config),
+    diagnostics,
+    rawSamples: basename(rawPath),
+  }
+  // Compression and disk I/O happen between workers, outside every measurement.
+  await writeFile(rawPath, await compress(JSON.stringify({ ...summary, runs })))
+  await writeFile(values.output, JSON.stringify(summary, null, 2) + '\n')
+}
+async function worker(implementation, scenario, pair, mode) {
+  const { stdout } = await execute(
+    process.execPath,
+    [
+      '--expose-gc',
+      fileURLToPath(new URL('./worker.js', import.meta.url)),
+      implementation,
+      scenario,
+      JSON.stringify({ ...config, seed: config.seed + pair }),
+      mode,
+    ],
+    { maxBuffer: 32 * 1024 * 1024, timeout: 10 * 60_000 },
+  )
+  return { pair, ...JSON.parse(stdout) }
+}
+console.log(JSON.stringify({ environment, config }))
+await checkpoint()
 for (const scenario of selected) {
-  for (let sample = 0; sample < samples; sample++) {
-    // Alternate order to reduce systematic bias; never run competing workers.
-    for (const implementation of sample % 2
+  for (let pair = 0; pair < config.processes; pair++) {
+    for (const implementation of pair % 2
       ? ['legacy', 'modern']
       : ['modern', 'legacy']) {
-      const { stdout } = await execute(
-        process.execPath,
-        [
-          '--expose-gc',
-          new URL('./worker.js', import.meta.url).pathname,
-          implementation,
-          scenario,
-          String(records),
-        ],
-        { maxBuffer: 1024 * 1024, timeout: 120_000 },
-      )
-      runs.push({ sample, ...JSON.parse(stdout) })
+      runs.push(await worker(implementation, scenario, pair, 'timing'))
+      await checkpoint()
     }
-  }
-  const summarize = (implementation) => {
-    const matching = runs.filter(
-      (r) => r.scenario === scenario && r.implementation === implementation,
+    const recent = runs.filter(
+      (r) => r.scenario === scenario && r.pair === pair,
     )
-    const median = (key) => {
-      const sorted = matching.map((r) => r[key]).sort((a, b) => a - b)
-      const middle = Math.floor(sorted.length / 2)
-      return sorted.length % 2
-        ? sorted[middle]
-        : (sorted[middle - 1] + sorted[middle]) / 2
-    }
-    return {
-      mibPerSecond: median('mibPerSecond'),
-      recordsPerSecond: median('recordsPerSecond'),
-      peakRssMiB: median('peakRssMiB'),
-      maxBufferedObjects: Math.max(
-        ...matching.map((r) => r.maxBufferedObjects),
-      ),
-      minMilliseconds: Math.min(...matching.map((r) => r.milliseconds)),
-      maxMilliseconds: Math.max(...matching.map((r) => r.milliseconds)),
-    }
+    console.log(
+      `${scenario}: process pair ${pair + 1}/${config.processes}, iterations ${recent.map((r) => `${r.implementation}=${r.latency.samplesCount}`).join(', ')}; warmup ${recent.every((r) => r.warmup.stable) ? 'stable' : 'NOT STABLE'}`,
+    )
   }
-  const current = summarize('modern')
-  const old = summarize('legacy')
+  for (const implementation of ['modern', 'legacy']) {
+    diagnostics.push(await worker(implementation, scenario, 0, 'memory'))
+  }
   console.log(
-    `${scenario}: modern ${current.mibPerSecond.toFixed(1)} MiB/s, legacy ${old.mibPerSecond.toFixed(1)} MiB/s, ${(current.mibPerSecond / old.mibPerSecond).toFixed(2)}x; peak RSS ${current.peakRssMiB.toFixed(1)}/${old.peakRssMiB.toFixed(1)} MiB; buffered objects ${current.maxBufferedObjects}/${old.maxBufferedObjects}; time range ${current.minMilliseconds.toFixed(0)}–${current.maxMilliseconds.toFixed(0)}/${old.minMilliseconds.toFixed(0)}–${old.maxMilliseconds.toFixed(0)} ms`,
+    formatResult(summarize(runs, config).find((r) => r.scenario === scenario)),
   )
+  await checkpoint()
 }
-if (values.output)
-  await writeFile(
-    values.output,
-    JSON.stringify({ environment, runs }, null, 2) + '\n',
-  )
+await checkpoint(true)

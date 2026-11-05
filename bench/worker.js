@@ -1,86 +1,113 @@
-import assert from 'node:assert/strict'
 import { performance } from 'node:perf_hooks'
-import { Readable, Writable } from 'node:stream'
-import { pipeline } from 'node:stream/promises'
-import * as modern from '../dist/index.js'
-import legacy from 'jsonlines-legacy'
+import { configuration } from './config.js'
 import { fixture } from './fixtures.js'
+import { statistics } from './statistics.js'
+import { workload } from './workload.js'
 
-const [implementation, scenario, count] = process.argv.slice(2)
-const library = implementation === 'modern' ? modern : legacy
-const data = fixture(scenario, Number(count))
+const [implementation, scenario, encoded = '{}', mode = 'timing'] =
+  process.argv.slice(2)
+const config = configuration(JSON.parse(encoded))
+if (!['timing', 'memory'].includes(mode)) throw new Error('Unknown worker mode')
+const data = fixture(
+  scenario,
+  mode === 'memory' ? config.memoryRecords : config.records,
+  config.seed,
+  mode === 'memory',
+)
+const task = workload(implementation, scenario, data, mode === 'memory')
+await task.run()
+task.validate()
+globalThis.gc() // Before warmup, never between measured iterations.
 
-async function run() {
-  let records = 0
-  let checksum = 0
-  let bytes = 0
-  let maxBufferedObjects = 0
-  const serializing = scenario.startsWith('stringify')
-  const transform = serializing
-    ? library.stringify()
-    : library.parse(
-        scenario === 'parse-limited'
-          ? { maxLineBytes: 1024 * 1024 }
-          : undefined,
-      )
-  const sink = new Writable({
-    objectMode: !serializing,
-    highWaterMark: serializing ? 64 * 1024 : 16,
-    write(value, _, callback) {
-      if (serializing) {
-        bytes += value.length
-      } else {
-        records++
-        checksum += value.id
-      }
-      if (scenario === 'parse-backpressure' && records % 16 === 0) {
-        setImmediate(() => {
-          maxBufferedObjects = Math.max(
-            maxBufferedObjects,
-            transform.readableLength + sink.writableLength,
-          )
-          callback()
-        })
-      } else callback()
+let result
+if (mode === 'memory') {
+  const baselineRssMiB = process.memoryUsage().rss / 1024 ** 2
+  await task.run()
+  const observed = task.validate()
+  result = {
+    baselineRssMiB,
+    peakRssMiB: process.resourceUsage().maxRSS / 1024,
+    maxBufferedObjects: observed.maxBufferedObjects,
+  }
+} else {
+  const { Bench } = await import('tinybench')
+  const warmup = []
+  const orderedSamples = []
+  let start, phaseSamples
+  const warnings = []
+  const bench = new Bench({
+    name: `${implementation}/${scenario}`,
+    concurrency: null,
+    warmup: false,
+    warmupTime: config.warmupTime,
+    warmupIterations: config.warmupIterations,
+    time: config.time,
+    iterations: config.iterations,
+    timestampProvider: 'hrtimeNow',
+    retainSamples: true,
+    throws: true,
+  })
+  bench.addEventListener('warning', (event) => warnings.push(event.reason))
+  bench.add(implementation, task.run, {
+    async: true,
+    beforeEach() {
+      start = performance.now()
+    },
+    afterEach() {
+      phaseSamples.push(performance.now() - start)
+      task.validate()
     },
   })
-  const start = performance.now()
-  const cpuStart = process.cpuUsage()
-  await pipeline(
-    Readable.from(serializing ? data.values() : data.chunks(), {
-      objectMode: serializing,
-    }),
-    transform,
-    sink,
-  )
-  const milliseconds = performance.now() - start
-  const cpu = process.cpuUsage(cpuStart)
-  if (serializing) assert.equal(bytes, data.bytes)
-  else {
-    assert.equal(records, data.records)
-    assert.equal(checksum, 42 * data.records)
+  let stableTransitions = 0
+  let stable = false
+  for (let window = 0; window < config.warmupWindows; window++) {
+    phaseSamples = []
+    await bench.getTask(implementation).warmup()
+    const summary = statistics(phaseSamples)
+    const previous = warmup.at(-1)?.median
+    const changePercent =
+      previous === undefined ? null : 100 * (summary.median / previous - 1)
+    stableTransitions =
+      changePercent !== null &&
+      Math.abs(changePercent) <= config.stabilityPercent
+        ? stableTransitions + 1
+        : 0
+    warmup.push({ ...summary, changePercent, samples: phaseSamples })
+    if (stableTransitions >= 2) {
+      stable = true
+      break
+    }
   }
-  return {
-    milliseconds,
+  phaseSamples = orderedSamples
+  const cpuStart = process.cpuUsage()
+  await bench.run()
+  const cpu = process.cpuUsage(cpuStart)
+  const measured = bench.getTask(implementation).result
+  if (measured.state !== 'completed')
+    throw new Error(`Incomplete benchmark: ${measured.state}`)
+  const third = Math.max(1, Math.floor(orderedSamples.length / 3))
+  const first = statistics(orderedSamples.slice(0, third)).median
+  const last = statistics(orderedSamples.slice(-third)).median
+  result = {
+    warmup: { stable, windows: warmup },
+    latency: measured.latency,
+    throughput: measured.throughput,
+    mibPerSecond: ((data.bytes / 1024 ** 2) * 1000) / measured.latency.mean,
+    recordsPerSecond: (data.records * 1000) / measured.latency.mean,
     cpuMilliseconds: (cpu.user + cpu.system) / 1000,
-    maxBufferedObjects,
+    measurementDriftPercent: 100 * (last / first - 1),
+    orderedSamples,
+    warnings,
   }
 }
-
-await run() // Exercise the same path before timing; do not time fixture generation.
-globalThis.gc()
-const baselineRss = process.memoryUsage().rss
-const result = await run()
 process.stdout.write(
   JSON.stringify({
-    ...result,
     implementation,
     scenario,
+    mode,
     records: data.records,
     bytes: data.bytes,
-    recordsPerSecond: data.records / (result.milliseconds / 1000),
-    mibPerSecond: data.bytes / 1024 ** 2 / (result.milliseconds / 1000),
-    baselineRssMiB: baselineRss / 1024 ** 2,
-    peakRssMiB: process.resourceUsage().maxRSS / 1024,
+    seed: config.seed,
+    ...result,
   }),
 )

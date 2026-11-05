@@ -106,4 +106,5 @@ npm run bench -- --output bench/results.local.json
 
 The compiler is pinned to TypeScript **7.0.2**. CI covers Node 22, 24 and 26.
 See [benchmark methodology and results](bench/README.md) for the comparison with
-`jsonlines@0.1.1`, profiling commands, and memory tradeoffs.
+`jsonlines@0.1.1`, using Tinybench, repeated warm-up, confidence intervals and
+a 5% minimum meaningful improvement. Quick benchmarks are smoke tests only.

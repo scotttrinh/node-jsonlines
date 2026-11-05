@@ -2,6 +2,6 @@ node_modules/
 dist/
 coverage/
 *.tgz
-bench/results.local.json
+bench/results.local*
 *.cpuprofile
 *.heapprofile
