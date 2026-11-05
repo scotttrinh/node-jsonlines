@@ -126,6 +126,22 @@ test('limits UTF-8 line bytes for complete and fragmented records', async () => 
   )
 })
 
+test('counts original bytes when malformed UTF-8 decodes to replacement characters', async () => {
+  const input = Buffer.from([10, 34, 0xf0, 0x9f, 34, 10])
+  for (let split = 0; split <= input.length; split++) {
+    const chunks = [input.subarray(0, split), input.subarray(split)]
+    assert.deepEqual(await collect(chunks, { maxLineBytes: 4 }), ['�'])
+    assert.deepEqual(
+      await Array.fromAsync(parseValues(chunks, { maxLineBytes: 4 })),
+      ['�'],
+    )
+    await assert.rejects(collect(chunks, { maxLineBytes: 3 }), {
+      code: 'ERR_JSONLINES_MAX_LINE',
+      line: 2,
+    })
+  }
+})
+
 test('handles large fragmented records without losing the next line', async () => {
   const value = '🌍'.repeat(40_000)
   const input = Buffer.from(JSON.stringify(value) + '\ntrue\n')
@@ -137,7 +153,7 @@ test('handles large fragmented records without losing the next line', async () =
   assert.deepEqual(await collect([input]), [value, true])
 })
 
-test('enforces byte limits across many records and at the decoding window boundary', async () => {
+test('enforces byte limits across many records and 64 KiB boundaries', async () => {
   for (const maxLineBytes of [65536, 65537]) {
     const prefix = 'true\n'.repeat(15000)
     const exact = '"' + 'x'.repeat(maxLineBytes - 2) + '"'
