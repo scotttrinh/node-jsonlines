@@ -1,6 +1,6 @@
 {
-  "name": "jsonlines",
-  "version": "1.0.0-alpha.0",
+  "name": "@scotttrinh/jsonlines",
+  "version": "0.1.0",
   "description": "Fast, low-memory JSON Lines streams for modern Node.js",
   "license": "MIT",
   "author": "Linus Unnebäck <linus@folkdatorn.se>",
@@ -43,5 +43,8 @@
     "prettier": "^3.9.0",
     "tinybench": "6.2.3",
     "typescript": "7.0.2"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
