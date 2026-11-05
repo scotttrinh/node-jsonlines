@@ -1,0 +1,621 @@
+{
+  "schemaVersion": 2,
+  "complete": true,
+  "environment": {
+    "date": "2026-11-05T20:44:08.991Z",
+    "node": "v26.13.0",
+    "v8": "14.6.202.34-node.40",
+    "platform": "linux 6.18.56 x64",
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.90GHz",
+    "logicalCpus": 4,
+    "baseline": "jsonlines-legacy",
+    "legacyVersion": "0.1.1",
+    "tinybenchVersion": "6.2.3"
+  },
+  "config": {
+    "quick": false,
+    "baseline": "jsonlines-legacy",
+    "processes": 7,
+    "records": 10000,
+    "time": 3000,
+    "iterations": 50,
+    "warmupTime": 500,
+    "warmupIterations": 8,
+    "warmupWindows": 12,
+    "thresholdPercent": 5,
+    "stabilityPercent": 5,
+    "memoryRecords": 300000,
+    "seed": 24301
+  },
+  "comparisons": [
+    {
+      "scenario": "stringify-small",
+      "pairs": 7,
+      "ratio": 1.2645977840098017,
+      "changePercent": 26.45977840098017,
+      "ci95": [
+        1.1764190722344885,
+        1.3593859476325632
+      ],
+      "thresholdPercent": 5,
+      "verdict": "meaningfully-faster",
+      "logRatio": {
+        "n": 7,
+        "mean": 0.23475411431583781,
+        "median": 0.24982528229777734,
+        "sd": 0.0781524644282668,
+        "cvPercent": 33.29120116000208,
+        "ci95": [
+          0.16247513993834142,
+          0.30703308869333423
+        ],
+        "min": 0.1002815424436898,
+        "max": 0.353310028252898
+      },
+      "modern": {
+        "processMeanLatencyMs": {
+          "n": 7,
+          "mean": 8.562330124935064,
+          "median": 8.312312764542936,
+          "sd": 0.7035988246857161,
+          "cvPercent": 8.217375579069397,
+          "ci95": [
+            7.911609744029179,
+            9.21305050584095
+          ],
+          "min": 7.9170014722955155,
+          "max": 9.544651701587306
+        },
+        "mibPerSecond": {
+          "n": 7,
+          "mean": 120.19924153116605,
+          "median": 123.12410661861365,
+          "sd": 9.422199592056854,
+          "cvPercent": 7.838817842801283,
+          "ci95": [
+            111.48516030703495,
+            128.91332275529717
+          ],
+          "min": 107.25125971949936,
+          "max": 129.26795774861333
+        },
+        "recordsPerSecond": {
+          "n": 7,
+          "mean": 1174387.0385387586,
+          "median": 1203034.6166299318,
+          "sd": 92089.54597983343,
+          "cvPercent": 7.841498837931374,
+          "ci95": [
+            1089218.4135567395,
+            1259555.6635207778
+          ],
+          "min": 1047707.1676001513,
+          "max": 1263104.4764856566
+        },
+        "withinProcess": [
+          {
+            "pair": 0,
+            "iterations": 379,
+            "meanMs": 7.9170014722955155,
+            "sdMs": 0.3756954792331809,
+            "cvPercent": 4.745426416148549,
+            "rmePercent": 0.4792879412301975,
+            "warmupStable": true,
+            "warmupWindows": 6,
+            "measurementDriftPercent": -0.5566734780145244
+          },
+          {
+            "pair": 1,
+            "iterations": 315,
+            "meanMs": 9.538640317460322,
+            "sdMs": 2.0914540021753703,
+            "cvPercent": 21.926122933338817,
+            "rmePercent": 2.4307026661286315,
+            "warmupStable": true,
+            "warmupWindows": 3,
+            "measurementDriftPercent": -1.9411110444091162
+          },
+          {
+            "pair": 2,
+            "iterations": 361,
+            "meanMs": 8.312312764542936,
+            "sdMs": 1.5075600039099983,
+            "cvPercent": 18.136468713504836,
+            "rmePercent": 1.8771965425138593,
+            "warmupStable": true,
+            "warmupWindows": 3,
+            "measurementDriftPercent": -4.167007215411466
+          },
+          {
+            "pair": 3,
+            "iterations": 315,
+            "meanMs": 9.544651701587306,
+            "sdMs": 2.4753300376806346,
+            "cvPercent": 25.934210226539534,
+            "rmePercent": 2.875034228953438,
+            "warmupStable": true,
+            "warmupWindows": 4,
+            "measurementDriftPercent": -40.561880500964264
+          },
+          {
+            "pair": 4,
+            "iterations": 373,
+            "meanMs": 8.058142254691685,
+            "sdMs": 0.5532522703539348,
+            "cvPercent": 6.865754573044614,
+            "rmePercent": 0.6990322656120735,
+            "warmupStable": true,
+            "warmupWindows": 3,
+            "measurementDriftPercent": -0.17321536974952423
+          },
+          {
+            "pair": 5,
+            "iterations": 376,
+            "meanMs": 7.9975512898936145,
+            "sdMs": 0.6524533708853151,
+            "cvPercent": 8.1581642584751,
+            "rmePercent": 0.8272762304215093,
+            "warmupStable": true,
+            "warmupWindows": 3,
+            "measurementDriftPercent": -4.533244537351145
+          },
+          {
+            "pair": 6,
+            "iterations": 351,
+            "meanMs": 8.568011074074073,
+            "sdMs": 1.7215953433674536,
+            "cvPercent": 20.093290362063435,
+            "rmePercent": 2.1093564421007454,
+            "warmupStable": true,
+            "warmupWindows": 3,
+            "measurementDriftPercent": -4.108626242657398
+          }
+        ]
+      },
+      "legacy": {
+        "processMeanLatencyMs": {
+          "n": 7,
+          "mean": 10.817298335494566,
+          "median": 10.671356223404256,
+          "sd": 0.7035305155228221,
+          "cvPercent": 6.503754391374625,
+          "ci95": [
+            10.166641130027493,
+            11.46795554096164
+          ],
+          "min": 9.658469765273315,
+          "max": 11.8917948972332
+        },
+        "mibPerSecond": {
+          "n": 7,
+          "mean": 94.96642810813738,
+          "median": 95.90590564526758,
+          "sd": 6.273120530987613,
+          "cvPercent": 6.605619118205087,
+          "ci95": [
+            89.16475926195055,
+            100.7680969543242
+          ],
+          "min": 86.082540728757,
+          "max": 105.97355782537261
+        },
+        "recordsPerSecond": {
+          "n": 7,
+          "mean": 927852.9800312018,
+          "median": 937088.0130557494,
+          "sd": 61301.29024352842,
+          "cvPercent": 6.606789174882747,
+          "ci95": [
+            871158.7424376283,
+            984547.2176247754
+          ],
+          "min": 840915.949729897,
+          "max": 1035360.6982293038
+        },
+        "withinProcess": [
+          {
+            "pair": 0,
+            "iterations": 267,
+            "meanMs": 11.272008857677905,
+            "sdMs": 0.6887450151727331,
+            "cvPercent": 6.110224218849828,
+            "rmePercent": 0.7362581237093554,
+            "warmupStable": true,
+            "warmupWindows": 3,
+            "measurementDriftPercent": -1.83819025766232
+          },
+          {
+            "pair": 1,
+            "iterations": 285,
+            "meanMs": 10.544796266666669,
+            "sdMs": 1.203017177271427,
+            "cvPercent": 11.408633669616783,
+            "rmePercent": 1.3301910026595887,
+            "warmupStable": true,
+            "warmupWindows": 3,
+            "measurementDriftPercent": -5.936639394315957
+          },
+          {
+            "pair": 2,
+            "iterations": 282,
+            "meanMs": 10.671356223404256,
+            "sdMs": 1.5567255818407804,
+            "cvPercent": 14.587888823602324,
+            "rmePercent": 1.7099780427319644,
+            "warmupStable": true,
+            "warmupWindows": 3,
+            "measurementDriftPercent": -3.342476677434225
+          },
+          {
+            "pair": 3,
+            "iterations": 253,
+            "meanMs": 11.8917948972332,
+            "sdMs": 2.467784575908231,
+            "cvPercent": 20.75199410378661,
+            "rmePercent": 2.5694397609276654,
+            "warmupStable": true,
+            "warmupWindows": 3,
+            "measurementDriftPercent": -5.079069759854027
+          },
+          {
+            "pair": 4,
+            "iterations": 285,
+            "meanMs": 10.550787445614038,
+            "sdMs": 2.160851484366725,
+            "cvPercent": 20.480475940826494,
+            "rmePercent": 2.3879235336678724,
+            "warmupStable": true,
+            "warmupWindows": 5,
+            "measurementDriftPercent": -3.5599654619664522
+          },
+          {
+            "pair": 5,
+            "iterations": 311,
+            "meanMs": 9.658469765273315,
+            "sdMs": 0.39126529480411726,
+            "cvPercent": 4.051007088212852,
+            "rmePercent": 0.45199097149319645,
+            "warmupStable": true,
+            "warmupWindows": 3,
+            "measurementDriftPercent": 0.24021663491606837
+          },
+          {
+            "pair": 6,
+            "iterations": 270,
+            "meanMs": 11.131874892592597,
+            "sdMs": 2.7113849983644456,
+            "cvPercent": 24.356948173830656,
+            "rmePercent": 2.9184176142747935,
+            "warmupStable": true,
+            "warmupWindows": 3,
+            "measurementDriftPercent": -6.8094956995836675
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "stringify-unicode",
+      "pairs": 7,
+      "ratio": 1.2530393182930981,
+      "changePercent": 25.30393182930981,
+      "ci95": [
+        1.1541526174940362,
+        1.3603985377579804
+      ],
+      "thresholdPercent": 5,
+      "verdict": "meaningfully-faster",
+      "logRatio": {
+        "n": 7,
+        "mean": 0.22557205474571126,
+        "median": 0.23710945248585227,
+        "sd": 0.08888578962644696,
+        "cvPercent": 39.40461052529243,
+        "ci95": [
+          0.14336641020291674,
+          0.3077776992885058
+        ],
+        "min": 0.08069967004462561,
+        "max": 0.3480813107234056
+      },
+      "modern": {
+        "processMeanLatencyMs": {
+          "n": 7,
+          "mean": 10.51120509559407,
+          "median": 10.407042183391,
+          "sd": 0.6419877472252526,
+          "cvPercent": 6.107651229204455,
+          "ci95": [
+            9.917465457671948,
+            11.104944733516191
+          ],
+          "min": 9.7754925276873,
+          "max": 11.827132751968497
+        },
+        "mibPerSecond": {
+          "n": 7,
+          "mean": 99.94096886743091,
+          "median": 100.65498141095128,
+          "sd": 5.736379836596608,
+          "cvPercent": 5.739768086705029,
+          "ci95": [
+            94.63570236992312,
+            105.2462353649387
+          ],
+          "min": 88.54686406373023,
+          "max": 107.13422831242305
+        },
+        "recordsPerSecond": {
+          "n": 7,
+          "mean": 954226.4581393459,
+          "median": 960887.8126735553,
+          "sd": 54756.27041779541,
+          "cvPercent": 5.738288846503493,
+          "ci95": [
+            903585.3542984332,
+            1004867.5619802586
+          ],
+          "min": 845513.4654961583,
+          "max": 1022966.3591554925
+        },
+        "withinProcess": [
+          {
+            "pair": 0,
+            "iterations": 254,
+            "meanMs": 11.827132751968497,
+            "sdMs": 1.6755281210910393,
+            "cvPercent": 14.166815881999515,
+            "rmePercent": 1.7505961698428372,
+            "warmupStable": true,
+            "warmupWindows": 3,
+            "measurementDriftPercent": -0.9310623367464466
+          },
+          {
+            "pair": 1,
+            "iterations": 307,
+            "meanMs": 9.7754925276873,
+            "sdMs": 0.2035962061505472,
+            "cvPercent": 2.0827206974369634,
+            "rmePercent": 0.2339004440133094,
+            "warmupStable": true,
+            "warmupWindows": 3,
+            "measurementDriftPercent": -0.9984479913665245
+          },
+          {
+            "pair": 2,
+            "iterations": 287,
+            "meanMs": 10.465164142857144,
+            "sdMs": 0.43286083466835773,
+            "cvPercent": 4.1362068359319615,
+            "rmePercent": 0.4805638562901174,
+            "warmupStable": true,
+            "warmupWindows": 6,
+            "measurementDriftPercent": -1.2423888838069441
+          },
+          {
+            "pair": 3,
+            "iterations": 289,
+            "meanMs": 10.407042183391,
+            "sdMs": 0.8242970930024569,
+            "cvPercent": 7.92057030688301,
+            "rmePercent": 0.9170320631232891,
+            "warmupStable": true,
+            "warmupWindows": 3,
+            "measurementDriftPercent": -3.317260473587391
+          },
+          {
+            "pair": 4,
+            "iterations": 293,
+            "meanMs": 10.259731129692828,
+            "sdMs": 0.9963782561432699,
+            "cvPercent": 9.711543543861866,
+            "rmePercent": 1.1166224024593447,
+            "warmupStable": true,
+            "warmupWindows": 3,
+            "measurementDriftPercent": -1.480085760074601
+          },
+          {
+            "pair": 5,
+            "iterations": 282,
+            "meanMs": 10.654104953900704,
+            "sdMs": 1.9435591531982255,
+            "cvPercent": 18.24235035798709,
+            "rmePercent": 2.138350445165957,
+            "warmupStable": true,
+            "warmupWindows": 7,
+            "measurementDriftPercent": -4.109181327370292
+          },
+          {
+            "pair": 6,
+            "iterations": 295,
+            "meanMs": 10.189767979661015,
+            "sdMs": 1.0548021153518488,
+            "cvPercent": 10.351581286809036,
+            "rmePercent": 1.1861381621146356,
+            "warmupStable": true,
+            "warmupWindows": 3,
+            "measurementDriftPercent": 0.20142203980273443
+          }
+        ]
+      },
+      "legacy": {
+        "processMeanLatencyMs": {
+          "n": 7,
+          "mean": 13.167643657817019,
+          "median": 13.00502844588745,
+          "sd": 0.7192014258601687,
+          "cvPercent": 5.461884028379004,
+          "ci95": [
+            12.502493277566126,
+            13.832794038067911
+          ],
+          "min": 12.305102090163935,
+          "max": 13.9965442
+        },
+        "mibPerSecond": {
+          "n": 7,
+          "mean": 79.74363807868966,
+          "median": 80.5392148138136,
+          "sd": 4.359371225392298,
+          "cvPercent": 5.4667323067083355,
+          "ci95": [
+            75.71189213942583,
+            83.77538401795348
+          ],
+          "min": 74.84137673871004,
+          "max": 85.1099795540774
+        },
+        "recordsPerSecond": {
+          "n": 7,
+          "mean": 761386.958708673,
+          "median": 768933.3430994744,
+          "sd": 41663.25722950805,
+          "cvPercent": 5.472021388463199,
+          "ci95": [
+            722854.8724359658,
+            799919.0449813802
+          ],
+          "min": 714462.0741454165,
+          "max": 812671.0308233432
+        },
+        "withinProcess": [
+          {
+            "pair": 0,
+            "iterations": 234,
+            "meanMs": 12.821147393162395,
+            "sdMs": 1.579328738941999,
+            "cvPercent": 12.318154456162524,
+            "rmePercent": 1.5865271266765555,
+            "warmupStable": true,
+            "warmupWindows": 3,
+            "measurementDriftPercent": -4.33245877383619
+          },
+          {
+            "pair": 1,
+            "iterations": 217,
+            "meanMs": 13.845493516129036,
+            "sdMs": 2.381219063951441,
+            "cvPercent": 17.19851344538558,
+            "rmePercent": 2.301173234548568,
+            "warmupStable": true,
+            "warmupWindows": 3,
+            "measurementDriftPercent": 19.823882277513015
+          },
+          {
+            "pair": 2,
+            "iterations": 244,
+            "meanMs": 12.305102090163935,
+            "sdMs": 0.5758263970752108,
+            "cvPercent": 4.6795743168640325,
+            "rmePercent": 0.5901031371180433,
+            "warmupStable": true,
+            "warmupWindows": 3,
+            "measurementDriftPercent": -3.0984418006996473
+          },
+          {
+            "pair": 3,
+            "iterations": 215,
+            "meanMs": 13.9965442,
+            "sdMs": 1.774549048472586,
+            "cvPercent": 12.67847993844499,
+            "rmePercent": 1.7043512213475016,
+            "warmupStable": true,
+            "warmupWindows": 3,
+            "measurementDriftPercent": 2.227184369932056
+          },
+          {
+            "pair": 4,
+            "iterations": 231,
+            "meanMs": 13.00502844588745,
+            "sdMs": 1.8780883749710247,
+            "cvPercent": 14.441247728027294,
+            "rmePercent": 1.8721389928735277,
+            "warmupStable": true,
+            "warmupWindows": 4,
+            "measurementDriftPercent": 0.9203332671662512
+          },
+          {
+            "pair": 5,
+            "iterations": 218,
+            "meanMs": 13.827192165137621,
+            "sdMs": 2.4574808263020578,
+            "cvPercent": 17.77281169562453,
+            "rmePercent": 2.3724927177707853,
+            "warmupStable": true,
+            "warmupWindows": 3,
+            "measurementDriftPercent": 9.848369658297408
+          },
+          {
+            "pair": 6,
+            "iterations": 243,
+            "meanMs": 12.372997794238685,
+            "sdMs": 0.5265780669629021,
+            "cvPercent": 4.255864873814945,
+            "rmePercent": 0.5377868311844303,
+            "warmupStable": true,
+            "warmupWindows": 3,
+            "measurementDriftPercent": 1.4483812190705159
+          }
+        ]
+      }
+    }
+  ],
+  "diagnostics": [
+    {
+      "pair": 0,
+      "implementation": "modern",
+      "scenario": "stringify-small",
+      "mode": "memory",
+      "records": 300000,
+      "bytes": 31921861,
+      "seed": 24301,
+      "baselineRssMiB": 65.45703125,
+      "peakRssMiB": 66.58203125,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 66.58203125,
+      "maxBufferedObjects": 0
+    },
+    {
+      "pair": 0,
+      "implementation": "legacy",
+      "scenario": "stringify-small",
+      "mode": "memory",
+      "records": 300000,
+      "bytes": 31921861,
+      "seed": 24301,
+      "baselineRssMiB": 65.1171875,
+      "peakRssMiB": 66.85546875,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 66.4921875,
+      "maxBufferedObjects": 0
+    },
+    {
+      "pair": 0,
+      "implementation": "modern",
+      "scenario": "stringify-unicode",
+      "mode": "memory",
+      "records": 300000,
+      "bytes": 32671569,
+      "seed": 24301,
+      "baselineRssMiB": 65.65234375,
+      "peakRssMiB": 70.93359375,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 70.77734375,
+      "maxBufferedObjects": 0
+    },
+    {
+      "pair": 0,
+      "implementation": "legacy",
+      "scenario": "stringify-unicode",
+      "mode": "memory",
+      "records": 300000,
+      "bytes": 32671569,
+      "seed": 24301,
+      "baselineRssMiB": 64.9375,
+      "peakRssMiB": 66.3125,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 66.3125,
+      "maxBufferedObjects": 0
+    }
+  ],
+  "rawSamples": "results-batching-node26.samples.json.gz"
+}

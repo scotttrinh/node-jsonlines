@@ -22,7 +22,7 @@ export interface ParseValuesOptions {
 }
 
 export interface StringifyOptions extends StreamOptions {
-  /** Coalesce output up to this many UTF-8 bytes. Defaults to 65536; 0 disables batching. */
+  /** Coalesce up to this many UTF-8 bytes and 64 records. Defaults to 65536; 0 disables batching. */
   batchBytes?: number
 }
 
@@ -198,10 +198,10 @@ function encode(value: unknown): string {
   }
 }
 
-/** An object-to-byte Transform. No runtime dependencies or intermediate arrays. */
+/** An object-to-byte Transform with bounded UTF-8 encoding batches. */
 export class Stringifier extends Transform {
   private readonly batchBytes: number
-  private buffered: Buffer | undefined
+  private buffered: string[] = []
   private bufferedBytes = 0
   private scheduled = false
 
@@ -244,22 +244,12 @@ export class Stringifier extends Transform {
     }
     if (this.bufferedBytes + lineBytes > this.batchBytes)
       output = this.takeBatch()
-    const required = this.bufferedBytes + lineBytes
-    if (this.buffered === undefined || this.buffered.length < required) {
-      const next = Buffer.allocUnsafe(
-        Math.min(
-          this.batchBytes,
-          Math.max(required, (this.buffered?.length ?? 2048) * 2),
-        ),
-      )
-      this.buffered?.copy(next, 0, 0, this.bufferedBytes)
-      this.buffered = next
-    }
-    this.buffered.write(line, this.bufferedBytes, lineBytes - 1, 'utf8')
-    this.buffered[required - 1] = 10
-    this.bufferedBytes = required
+    this.buffered.push(line)
+    this.bufferedBytes += lineBytes
+    // Bound string references as well as bytes, including for tiny records.
+    if (this.buffered.length === 64) output = this.takeBatch()
     // Flush sparse writes promptly while letting synchronous producers share
-    // one downstream write per batch. Buffers are never reused after emission.
+    // one downstream write and UTF-8 encoding per batch.
     if (!this.scheduled) {
       this.scheduled = true
       queueMicrotask(() => {
@@ -272,8 +262,8 @@ export class Stringifier extends Transform {
   }
 
   private takeBatch(): Buffer {
-    const result = this.buffered!.subarray(0, this.bufferedBytes)
-    this.buffered = undefined
+    const result = Buffer.from(this.buffered.join('\n') + '\n')
+    this.buffered = []
     this.bufferedBytes = 0
     return result
   }
@@ -286,7 +276,7 @@ export class Stringifier extends Transform {
     error: Error | null,
     callback: (error?: Error | null) => void,
   ): void {
-    this.buffered = undefined
+    this.buffered = []
     this.bufferedBytes = 0
     callback(error)
   }

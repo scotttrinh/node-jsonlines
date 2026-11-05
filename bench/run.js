@@ -1,9 +1,9 @@
 import { execFile } from 'node:child_process'
 import { writeFile } from 'node:fs/promises'
 import { cpus, platform, arch, release } from 'node:os'
-import { basename } from 'node:path'
+import { basename, resolve } from 'node:path'
 import { parseArgs, promisify } from 'node:util'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { gzip } from 'node:zlib'
 import { configuration } from './config.js'
 import { scenarios } from './fixtures.js'
@@ -12,6 +12,7 @@ import { formatResult, summarize } from './report.js'
 const { values } = parseArgs({
   options: {
     quick: { type: 'boolean', default: false },
+    baseline: { type: 'string' },
     processes: { type: 'string' },
     records: { type: 'string' },
     time: { type: 'string' },
@@ -28,6 +29,9 @@ const { values } = parseArgs({
 })
 const config = configuration({
   ...values,
+  baseline: values.baseline
+    ? pathToFileURL(resolve(values.baseline)).href
+    : undefined,
   warmupTime: values['warmup-time'],
   warmupIterations: values['warmup-iterations'],
   warmupWindows: values['warmup-windows'],
@@ -52,7 +56,8 @@ const environment = {
   platform: `${platform()} ${release()} ${arch()}`,
   cpu: cpus()[0]?.model,
   logicalCpus: cpus().length,
-  legacyVersion: '0.1.1',
+  baseline: config.baseline,
+  legacyVersion: config.baseline === 'jsonlines-legacy' ? '0.1.1' : null,
   tinybenchVersion: '6.2.3',
 }
 const rawPath = values.output

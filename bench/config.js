@@ -2,6 +2,7 @@ export function configuration(values = {}) {
   const quick = values.quick ?? false
   const config = {
     quick,
+    baseline: values.baseline ?? 'jsonlines-legacy',
     processes: Number(values.processes ?? (quick ? 1 : 7)),
     records: Number(values.records ?? (quick ? 1000 : 10000)),
     time: Number(values.time ?? (quick ? 100 : 3000)),
@@ -14,6 +15,8 @@ export function configuration(values = {}) {
     memoryRecords: Number(values.memoryRecords ?? (quick ? 1000 : 300000)),
     seed: Number(values.seed ?? 0x5eed),
   }
+  if (typeof config.baseline !== 'string' || !config.baseline.length)
+    throw new Error('baseline must be a module specifier')
   for (const [name, value] of Object.entries(config)) {
     if (
       typeof value === 'number' &&

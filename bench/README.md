@@ -93,10 +93,16 @@ records) from a bounded pool of at most 1,024 varied objects, or four large obje
 The backpressure case assembles the requested single large byte chunk. This
 keeps fixture allocation from scaling with the number of decoded objects and
 makes buffering visible. These diagnostics are not used in the speed comparison.
-They run one preflight, GC, then one observed pass. RSS is the **whole-process
-high-water mark**, including fixture construction and preflight, rather than live
-allocation or a memory confidence interval. Queue counts sample the parser and
-sink together only while the slow sink is stalled.
+They run one preflight, GC, then one observed pass. On Linux, RSS uses
+`/proc/self/status`'s **VmHWM**, including fixture construction and preflight,
+rather than live allocation or a memory confidence interval. The report records
+`peakRssSource`; other platforms fall back to `resourceUsage().maxRSS`. The raw
+resource-usage value is also retained as `resourceUsageMaxRssMiB`. Linux rusage
+can retain the spawning process's resident footprint across `exec()`, inflating
+apparent worker peaks. VmHWM resets with the executable's address space and avoids
+that contamination. The initial recorded RSS values below used rusage and are
+superseded by the follow-up probes. Queue counts sample the parser and sink
+together only while the slow sink is stalled.
 
 ## Artifacts and controls
 
@@ -133,7 +139,25 @@ const raw = JSON.parse(
 console.log(raw.runs[0].latency)
 ```
 
-## Recorded results
+To compare an optimization with a previous revision, build that revision in a
+separate checkout and pass its ESM entry point. The same workloads, seeds and
+process-pair protocol then compare the two versions in one session:
+
+```sh
+git worktree add --detach /tmp/jsonlines-before 934eaef
+npm --prefix /tmp/jsonlines-before ci
+npm --prefix /tmp/jsonlines-before run build
+npm run bench -- --baseline /tmp/jsonlines-before/dist/index.js \
+  --scenario stringify-small --scenario stringify-unicode \
+  --output bench/results.local.json
+```
+
+The configuration and environment record the baseline module. For compatibility,
+the reference implementation is still called `legacy` inside the JSON schema,
+even when `--baseline` selects a previous ESM build. Omitting that flag always
+compares with published `jsonlines@0.1.1`.
+
+## Initial recorded results
 
 Recorded on 2026-11-05 on Linux x64, Intel Xeon 2.90 GHz, four logical CPUs.
 There are seven independent process pairs per row. MiB/s columns show the mean
@@ -141,6 +165,8 @@ There are seven independent process pairs per row. MiB/s columns show the mean
 Ratios are geometric means of paired legacy/modern mean latencies, with 95%
 per-scenario intervals. These new corpus/batch sizes supersede the one-shot
 measurements; compare implementations within each row, not across protocols.
+The stringifier follow-up below supersedes these initial serialization results;
+the parser implementation is unchanged.
 
 ### Node 22.23.4
 
@@ -180,15 +206,95 @@ slightly below the predeclared 5% threshold. It remains inconclusive at that bar
 
 The timed 10,000-record backpressure case is about 10% slower on Node 26
 (95% ratio interval 0.8549–0.9402). The separate 300,000-record memory probe queued
-32 objects versus 299,985; peak RSS was 99.8 / 220.4 MiB on Node 22 and
-105.8 / 257.2 MiB on Node 26 (modern / legacy). These are different batch sizes:
-the memory probe does not establish throughput at 300,000 records.
+32 objects versus 299,985. Its original rusage-based RSS readings are superseded
+by the corrected VmHWM probes below. These are different batch sizes: the memory
+probe does not establish throughput at 300,000 records.
 
 Six Node 22 workers and two Node 26 workers exhausted the warm-up budget.
 Rows marked **Warm-up warning** retain all samples and their intervals, but are
 not accepted as clean steady-state wins. In particular, the large-record effect
 is substantial while its exact steady-state multiplier remains qualified.
 No outliers or failed convergence checks were silently removed.
+
+## Batched encoding follow-up
+
+The stringifier now collects at most 64 records within the byte target and uses
+one native `join()` and UTF-8 encoding per batch. This removes manual buffer
+growth, copying during growth, and per-record UTF-8 writes. The record cap bounds
+reference-array metadata even for tiny values. Byte targets, oversized records,
+sparse-write flushing and backpressure remain covered by stream tests.
+
+The confirmation runs below use seven fresh-process pairs, three-second/50-iteration
+measurement budgets and the same 5% practical threshold. Their maximum warm-up
+budget is 12 windows; the convergence rule and 500 ms minimum window are unchanged.
+All 112 timing workers and 32,931 measured iterations are retained. One worker
+exhausted its warm-up budget. Screening experiments are excluded from these
+confirmation samples. MiB/s again shows process mean ± sample SD; ratios have
+paired, per-case 95% intervals. Absolute rates from separate sessions should not
+be compared as if they were paired observations.
+
+### Against the previous modern implementation
+
+The reference is commit `934eaef`, before this encoding change. These comparisons
+measure the incremental benefit of the change, independently of legacy's behavior.
+
+| Node | Scenario          | Current MiB/s ± SD | Previous MiB/s ± SD |         Ratio [95% CI] | Decision           |
+| ---- | ----------------- | -----------------: | ------------------: | ---------------------: | ------------------ |
+| 22   | stringify-small   |        129.5 ± 3.4 |         128.4 ± 4.2 | 1.009 [0.9698, 1.0500] | Inconclusive at 5% |
+| 22   | stringify-unicode |         88.9 ± 4.6 |          79.7 ± 5.2 | 1.116 [1.0311, 1.2080] | Warm-up warning    |
+| 26   | stringify-small   |        126.8 ± 5.2 |         108.6 ± 6.5 | 1.168 [1.0736, 1.2716] | ≥5% gain supported |
+| 26   | stringify-unicode |         99.6 ± 4.8 |          87.5 ± 1.5 | 1.137 [1.0769, 1.2010] | ≥5% gain supported |
+
+[Node 22 summary](results-batching-before-node22.json) ·
+[Node 22 samples](results-batching-before-node22.samples.json.gz) ·
+[Node 26 summary](results-batching-before-node26.json) ·
+[Node 26 samples](results-batching-before-node26.samples.json.gz)
+
+Node 26 supports about 17% faster ASCII encoding and 14% faster Unicode encoding
+with less implementation code. Incremental Node 22 gains remain inconclusive;
+its ASCII upper bound is just above 1.05 before rounding, and its Unicode case
+also has a failed warm-up convergence check.
+
+### Against published jsonlines@0.1.1
+
+| Node | Scenario          | Current MiB/s ± SD | Legacy MiB/s ± SD |         Ratio [95% CI] | Decision           |
+| ---- | ----------------- | -----------------: | ----------------: | ---------------------: | ------------------ |
+| 22   | stringify-small   |        114.4 ± 8.5 |        93.7 ± 5.8 | 1.219 [1.1044, 1.3463] | ≥5% gain supported |
+| 22   | stringify-unicode |         85.1 ± 3.5 |        81.0 ± 7.3 | 1.054 [0.9716, 1.1425] | Inconclusive at 5% |
+| 26   | stringify-small   |        120.2 ± 9.4 |        95.0 ± 6.3 | 1.265 [1.1764, 1.3594] | ≥5% gain supported |
+| 26   | stringify-unicode |         99.9 ± 5.7 |        79.7 ± 4.4 | 1.253 [1.1542, 1.3604] | ≥5% gain supported |
+
+[Node 22 summary](results-batching-node22.json) ·
+[Node 22 samples](results-batching-node22.samples.json.gz) ·
+[Node 26 summary](results-batching-node26.json) ·
+[Node 26 samples](results-batching-node26.samples.json.gz)
+
+### Corrected memory observations
+
+Single, separate 300,000-record VmHWM probes compare current serialization with
+the previous modern implementation. They do not establish a memory confidence
+interval or equivalence. Unicode still has a modest observed RSS cost:
+
+| Node | Scenario          | Current peak MiB | Previous peak MiB |
+| ---- | ----------------- | ---------------: | ----------------: |
+| 22   | stringify-small   |             62.2 |              62.5 |
+| 22   | stringify-unicode |             65.7 |              63.0 |
+| 26   | stringify-small   |             66.7 |              67.5 |
+| 26   | stringify-unicode |             71.3 |              68.4 |
+
+Against published legacy, Unicode peaks are 66.3 / 61.2 MiB on Node 22 and
+70.9 / 66.3 MiB on Node 26 (current / legacy), again single observations.
+
+Fresh [backpressure probes](results-memory-backpressure.json) supersede the
+initial rusage-based parser RSS readings. They still queue 32 objects versus
+299,985 for legacy. Corrected peaks are 101.6 / 227.1 MiB on Node 22 and
+107.6 / 261.6 MiB on Node 26 (modern / legacy). Fixture/preflight allocation is
+included. The parser code and its earlier timing results are unchanged, including
+the Node 26 slow-consumer throughput regression.
+
+Native line splitting, StringDecoder framing and a direct Duplex parser were
+screened without consistent gains across workloads. Their parser changes were
+discarded. The retained runtime change is the simpler bounded-batch stringifier.
 
 ## Profiling
 

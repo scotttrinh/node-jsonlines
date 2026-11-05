@@ -1,0 +1,68 @@
+{
+  "complete": true,
+  "environment": {
+    "date": "2026-11-05T20:50:25.601Z",
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.90GHz",
+    "platform": "linux 6.18.56 x64",
+    "legacyVersion": "0.1.1"
+  },
+  "protocol": "One preflight, forced GC, one observed pass per worker; Linux VmHWM includes fixture construction and preflight.",
+  "probes": [
+    {
+      "node": "v22.23.4",
+      "implementation": "modern",
+      "scenario": "parse-backpressure",
+      "mode": "memory",
+      "records": 300000,
+      "bytes": 31921861,
+      "seed": 24301,
+      "baselineRssMiB": 94.12890625,
+      "peakRssMiB": 101.60546875,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 101.3671875,
+      "maxBufferedObjects": 32
+    },
+    {
+      "node": "v22.23.4",
+      "implementation": "legacy",
+      "scenario": "parse-backpressure",
+      "mode": "memory",
+      "records": 300000,
+      "bytes": 31921861,
+      "seed": 24301,
+      "baselineRssMiB": 181.0390625,
+      "peakRssMiB": 227.1171875,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 226.578125,
+      "maxBufferedObjects": 299985
+    },
+    {
+      "node": "v26.13.0",
+      "implementation": "modern",
+      "scenario": "parse-backpressure",
+      "mode": "memory",
+      "records": 300000,
+      "bytes": 31921861,
+      "seed": 24301,
+      "baselineRssMiB": 100.171875,
+      "peakRssMiB": 107.609375,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 107.265625,
+      "maxBufferedObjects": 32
+    },
+    {
+      "node": "v26.13.0",
+      "implementation": "legacy",
+      "scenario": "parse-backpressure",
+      "mode": "memory",
+      "records": 300000,
+      "bytes": 31921861,
+      "seed": 24301,
+      "baselineRssMiB": 206.86328125,
+      "peakRssMiB": 261.6484375,
+      "peakRssSource": "linux-vmhwm",
+      "resourceUsageMaxRssMiB": 261.11328125,
+      "maxBufferedObjects": 299985
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 import { performance } from 'node:perf_hooks'
+import { readFileSync } from 'node:fs'
 import { configuration } from './config.js'
 import { fixture } from './fixtures.js'
 import { statistics } from './statistics.js'
@@ -7,6 +8,10 @@ import { workload } from './workload.js'
 const [implementation, scenario, encoded = '{}', mode = 'timing'] =
   process.argv.slice(2)
 const config = configuration(JSON.parse(encoded))
+const baseline =
+  config.baseline === 'jsonlines-legacy'
+    ? undefined
+    : await import(config.baseline)
 if (!['timing', 'memory'].includes(mode)) throw new Error('Unknown worker mode')
 const data = fixture(
   scenario,
@@ -14,7 +19,13 @@ const data = fixture(
   config.seed,
   mode === 'memory',
 )
-const task = workload(implementation, scenario, data, mode === 'memory')
+const task = workload(
+  implementation,
+  scenario,
+  data,
+  mode === 'memory',
+  baseline,
+)
 await task.run()
 task.validate()
 globalThis.gc() // Before warmup, never between measured iterations.
@@ -24,9 +35,18 @@ if (mode === 'memory') {
   const baselineRssMiB = process.memoryUsage().rss / 1024 ** 2
   await task.run()
   const observed = task.validate()
+  const resourceUsageMaxRssMiB = process.resourceUsage().maxRSS / 1024
+  // Linux rusage can retain the spawning process's peak across exec(). VmHWM
+  // belongs to this executable's address space, including fixture/preflight work.
+  const vmHwm =
+    process.platform === 'linux'
+      ? readFileSync('/proc/self/status', 'utf8').match(/^VmHWM:\s+(\d+) kB$/m)
+      : null
   result = {
     baselineRssMiB,
-    peakRssMiB: process.resourceUsage().maxRSS / 1024,
+    peakRssMiB: vmHwm ? Number(vmHwm[1]) / 1024 : resourceUsageMaxRssMiB,
+    peakRssSource: vmHwm ? 'linux-vmhwm' : 'resource-usage',
+    resourceUsageMaxRssMiB,
     maxBufferedObjects: observed.maxBufferedObjects,
   }
 } else {

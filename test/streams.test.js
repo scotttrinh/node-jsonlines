@@ -302,6 +302,12 @@ test('serializes compact newline-terminated JSON and rejects unrepresentable val
 
 test('batches output with slow consumers and flushes sparse writes without waiting for end', async () => {
   const values = Array.from({ length: 1000 }, (_, id) => ({ id, text: 'é 🦄' }))
+  values.splice(
+    50,
+    0,
+    { id: -1, text: '🌍'.repeat(20000) },
+    { id: -2, text: '\ud800\n\r\t"\\' },
+  )
   const expected = values.map((value) => JSON.stringify(value) + '\n').join('')
   for (const batchBytes of [0, 1, 4096, 65536]) {
     const output = []
@@ -317,6 +323,14 @@ test('batches output with slow consumers and flushes sparse writes without waiti
       }),
     )
     assert.equal(Buffer.concat(output).toString(), expected)
+    if (batchBytes > 0) {
+      for (const chunk of output) {
+        if (chunk.length > batchBytes) {
+          // Only an individual record may exceed the byte target.
+          assert.equal(chunk.toString().split('\n').length, 2)
+        }
+      }
+    }
     if (batchBytes >= 4096) assert.ok(output.length < 20)
   }
   const encoder = stringify()

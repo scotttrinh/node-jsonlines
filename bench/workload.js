@@ -4,10 +4,16 @@ import { pipeline } from 'node:stream/promises'
 import * as modern from '../dist/index.js'
 import legacy from 'jsonlines-legacy'
 
-export function workload(implementation, scenario, data, diagnostic = false) {
+export function workload(
+  implementation,
+  scenario,
+  data,
+  diagnostic = false,
+  baseline = legacy,
+) {
   if (!['modern', 'legacy'].includes(implementation))
     throw new Error('Unknown implementation')
-  const library = implementation === 'modern' ? modern : legacy
+  const library = implementation === 'modern' ? modern : baseline
   const serializing = scenario.startsWith('stringify')
   let observed
   async function run() {

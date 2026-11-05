@@ -57,6 +57,7 @@ test('configuration rejects insufficient replication and invalid durations', () 
     { records: NaN },
     { iterations: 0 },
     { warmupWindows: 2 },
+    { baseline: '' },
   ]) {
     assert.throws(() => configuration(values))
   }
@@ -107,6 +108,8 @@ test('Tinybench smoke runs export raw samples without claiming significance', as
       [
         fileURLToPath(new URL('../bench/run.js', import.meta.url)),
         '--quick',
+        '--baseline',
+        fileURLToPath(new URL('../dist/index.js', import.meta.url)),
         '--scenario',
         'parse-large-record',
         '--time',
@@ -120,6 +123,11 @@ test('Tinybench smoke runs export raw samples without claiming significance', as
     )
     const report = JSON.parse(await readFile(output, 'utf8'))
     assert.equal(report.complete, true)
+    assert.equal(report.environment.legacyVersion, null)
+    assert.equal(
+      report.config.baseline,
+      new URL('../dist/index.js', import.meta.url).href,
+    )
     assert.equal(report.comparisons[0].verdict, 'smoke-only')
     assert.equal(report.comparisons[0].ci95, null)
     const raw = JSON.parse(
@@ -136,3 +144,32 @@ test('Tinybench smoke runs export raw samples without claiming significance', as
     await rm(directory, { recursive: true, force: true })
   }
 })
+
+test(
+  'Linux memory diagnostics exclude RSS inherited before exec',
+  { skip: process.platform !== 'linux' },
+  async () => {
+    const worker = fileURLToPath(new URL('../bench/worker.js', import.meta.url))
+    const parent = `
+      import { execFileSync } from 'node:child_process'
+      const retained = Buffer.alloc(128 * 1024 ** 2, 1)
+      const result = execFileSync(process.execPath, [
+        '--expose-gc', process.argv[1], 'modern', 'stringify-small',
+        '{"quick":true}', 'memory',
+      ])
+      process.stdout.write(JSON.stringify({
+        parentRssMiB: process.memoryUsage().rss / 1024 ** 2,
+        report: JSON.parse(result),
+      }))
+      if (retained[0] !== 1) throw new Error('Allocation was not retained')
+    `
+    const { stdout } = await promisify(execFile)(
+      process.execPath,
+      ['--input-type=module', '-e', parent, worker],
+      { timeout: 30000 },
+    )
+    const { report, parentRssMiB } = JSON.parse(stdout)
+    assert.equal(report.peakRssSource, 'linux-vmhwm')
+    assert.ok(report.peakRssMiB < parentRssMiB - 64)
+  },
+)

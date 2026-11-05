@@ -70,7 +70,8 @@ await pipeline(
 - `parse()` / `stringify()`: accept `readableHighWaterMark`,
   `writableHighWaterMark` and `signal`. Water marks use bytes on byte sides and
   objects on object sides. They default to Node's settings.
-- `stringify({ batchBytes })`: coalesce output with a default target of 64 KiB;
+- `stringify({ batchBytes })`: coalesce output with a default target of 64 KiB
+  and at most 64 records per batch;
   flush sparse writes in a microtask and remaining output at EOF. `0` disables
   batching. A single record may exceed the target; records are never split.
 - `parseValues(source, { signal })`: check cancellation between chunks and records.
