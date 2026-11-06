@@ -1,19 +1,55 @@
 {
-  "name": "jsonlines",
-  "version": "0.1.1",
+  "name": "@scotttrinh/jsonlines",
+  "version": "0.1.0",
+  "description": "Fast, low-memory JSON Lines streams for modern Node.js",
   "license": "MIT",
   "author": "Linus Unnebäck <linus@folkdatorn.se>",
-  "main": "index.js",
   "repository": {
     "type": "git",
-    "url": "http://github.com/LinusU/node-jsonlines.git"
+    "url": "https://github.com/scotttrinh/node-jsonlines.git"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
-    "test": "standard && mocha"
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && node --test test/*.test.js",
+    "test:coverage": "npm run build && node --experimental-test-coverage --test test/*.test.js",
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm test",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check .",
+    "bench": "npm run build && node bench/run.js",
+    "bench:quick": "npm run bench -- --quick",
+    "prepack": "npm run build",
+    "lint": "oxlint --type-aware",
+    "lint:fix": "oxlint --type-aware --fix"
   },
   "devDependencies": {
-    "concat-stream": "^1.5.0",
-    "mocha": "^2.2.5",
-    "standard": "^5.0.2"
+    "@types/node": "^22.20.0",
+    "fast-check": "4.10.2",
+    "jsonlines-legacy": "npm:jsonlines@0.1.1",
+    "oxfmt": "0.77.0",
+    "oxlint": "1.92.0",
+    "oxlint-tsgolint": "7.0.2006",
+    "tinybench": "6.2.3",
+    "typescript": "7.0.2"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

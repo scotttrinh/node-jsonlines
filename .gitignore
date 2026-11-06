@@ -1,1 +1,8 @@
 node_modules/
+dist/
+coverage/
+*.tgz
+bench/results*.json
+bench/results*.json.gz
+*.cpuprofile
+*.heapprofile

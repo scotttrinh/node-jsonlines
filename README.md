@@ -1,87 +1,117 @@
-# JSONLines for Node.js
+# @scotttrinh/jsonlines
 
-Parse [JSONLines](http://jsonlines.org) with Node.js.
-
-## Installation
+ESM-only, TypeScript-first [JSON Lines](https://jsonlines.org) streams for Node.js 22+.
+Zero runtime dependencies.
 
 ```sh
-npm install --save jsonlines
+npm install @scotttrinh/jsonlines
 ```
 
-## Usage
+## Node.js streams
 
-```javascript
-var jsonlines = require('jsonlines')
-var parser = jsonlines.parse()
+`parse<T>(options?)` transforms UTF-8 bytes into JavaScript values.
+`stringify(options?)` transforms values into compact JSON encoded as UTF-8 Buffers,
+with a trailing LF per record. Both return Node.js Transforms; use `pipeline()`
+for backpressure, error propagation and cleanup.
 
-parser.on('data', function (data) {
-  console.log('Got json:', data)
-})
+```ts
+import { createReadStream, createWriteStream } from "node:fs";
+import { pipeline } from "node:stream/promises";
+import { parse, stringify } from "@scotttrinh/jsonlines";
 
-parser.on('end', function () {
-  console.log('No more data')
-})
-
-parser.write('{ "test": "This is a test!" }\n')
-parser.write('{ "jsonlines": "is awesome" }')
-parser.end()
+await pipeline(
+  createReadStream("input.jsonl"),
+  parse({ maxLineBytes: 8 * 1024 * 1024 }),
+  stringify(),
+  createWriteStream("output.jsonl"),
+);
 ```
 
-```javascript
-var jsonlines = require('jsonlines')
-var stringifier = jsonlines.stringify()
+`parse<T>()` types async iteration, `read()` and `on('data')` listeners. `T`
+describes the expected JSON and does not perform schema validation. The exported
+`Parser<T>` and `Stringifier` classes accept the same options as their factories.
 
-stringifier.pipe(process.stdout)
-
-stringifier.write({ test: 'This is a test!' })
-stringifier.write({ jsonlines: 'is awesome' })
-stringifier.end()
+```ts
+const parser = parse<{ id: number }>({ emitInvalidLines: true });
+parser.on("data", (record) => console.log(record.id));
+parser.on("invalid-line", (error) => console.error(error.line, error.source));
+await pipeline(createReadStream("input.jsonl"), parser);
 ```
 
-## API
+Node object streams reserve `null` for EOF: `parse()` rejects JSON `null`, and
+`stringify()` cannot accept `.write(null)`. Use the iterable APIs for those values.
 
-### `.parse([options])`
+## Iterables and Web Streams
 
-Returns a transform stream that turns newline separated json into a stream of
-javascript values.
+`parseValues<T>(source, options?)` accepts synchronous or asynchronous iterables
+of strings or `Uint8Array`s, including Node Readables and Web ReadableStreams.
+It yields parsed values, including `null`. Breaking iteration closes the source.
+`stringifyValues(source)` accepts synchronous or asynchronous iterables of values
+and yields compact JSON strings with a trailing LF.
 
-`options` is an optional object with the keys documented below.
+```ts
+import { parseValues, stringifyValues } from "@scotttrinh/jsonlines";
 
-### `.stringify()`
+for await (const record of parseValues<{ id: number } | null>(createReadStream("input.jsonl"), {
+  maxLineBytes: 8 * 1024 * 1024,
+})) {
+  console.log(record?.id);
+}
 
-Returns a transform stream that turns javascript values into a stream of newline
-separated json.
-
-## Options
-
-### `emitInvalidLine`
-
-If true, instead of emitting an error and cancelling the stream when an invalid line is proccessed, an `invalid-line` event is emitted with the same error. This is very useful when processing text that have mixed plain text and json data.
-
-Example:
-
-```js
-var jsonlines = require('jsonlines')
-var parser = jsonlines.parse({ emitInvalidLines: true })
-
-parser.on('data', function (data) {
-  console.log('Got json:', data)
-})
-
-parser.on('invalid-line', function (err) {
-  console.log('Got text:', err.source)
-})
-
-parser.write('{ "test": "This is a test!" }\n')
-parser.write('This is some plain text\n')
-parser.write('{ "jsonlines": "is awesome" }')
-parser.end()
+await pipeline(stringifyValues([{ id: 1 }, null, { id: 2 }]), createWriteStream("output.jsonl"));
 ```
 
-Output:
+## Options and errors
 
-```text
-Got json: { test: 'This is a test!' }
-Got text: This is some plain text
-Got json: { jsonlines: 'is awesome' }
+- `maxLineBytes` in `parse()` and `parseValues()`: maximum UTF-8 bytes per line,
+  excluding LF and including any CR. Defaults to `Infinity`. Exceeding it fails
+  with `ERR_JSONLINES_MAX_LINE`, even when skipping invalid JSON.
+- `emitInvalidLines` in `parse()`: when `true`, emit `invalid-line` and skip
+  malformed JSON or unrepresentable `null` records. Defaults to `false`.
+  `JsonLineError` (`ERR_JSONLINES_PARSE`) includes `source`, a 1-based physical
+  `line`, and the original `cause`; a `null` error has code `ERR_JSONLINES_NULL`,
+  `source` and `line`.
+- `readableHighWaterMark` and `writableHighWaterMark` in `parse()` and
+  `stringify()`: use bytes on byte sides and objects on object sides. Defaults
+  follow Node's settings. Input buffers and individual values must fit in memory.
+- `signal` in `parse()`, `stringify()` and `parseValues()`: cancel processing.
+  `parseValues()` checks between chunks and records; also pass the signal to
+  the source to interrupt a pending read.
+- `batchBytes` in `stringify()`: output target in UTF-8 bytes. Defaults to 64 KiB,
+  with at most 64 records per batch. Sparse writes flush in a microtask; remaining
+  output flushes at EOF. `0` disables batching. A single record can exceed the
+  target; records are never split between output chunks.
+
+Parsers accept LF, CRLF, empty lines and an unterminated final record. Whitespace-only
+lines and BOMs are invalid JSON. Split UTF-8 sequences in byte chunks are preserved;
+string chunks must contain complete Unicode characters.
+
+Serialization follows `JSON.stringify()` semantics, including `toJSON()` and
+non-finite numbers. Circular references, BigInt and top-level values without a
+JSON representation fail with `ERR_JSONLINES_STRINGIFY`, retaining `source` and
+`cause`.
+
+## Development
+
+```sh
+npm ci
+npm run check
+npm run bench:quick
 ```
+
+Stream properties use fast-check with 100 runs each. Set `FC_RUNS`
+for larger runs. Failures report a minimized counterexample, seed and shrink
+path; use `FC_SEED`, `FC_PATH` and the matching test name to replay:
+
+```sh
+FC_RUNS=1000 npm test
+FC_SEED=123 FC_PATH=0 node --test \
+  --test-name-pattern='parsing is independent' test/streams.test.js
+```
+
+Use `npm run lint` for Oxlint with type-aware rules and `npm run format` for
+Oxfmt. Both use their default rules and formatting options. `npm run check` runs
+these checks alongside TypeScript and the tests.
+
+TypeScript is pinned to **7.0.2**. CI covers Node 22, 24 and 26.
+See [benchmarks](bench/README.md) for running throughput and memory comparisons.
