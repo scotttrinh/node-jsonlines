@@ -15,16 +15,16 @@ with a trailing LF per record. Both return Node.js Transforms; use `pipeline()`
 for backpressure, error propagation and cleanup.
 
 ```ts
-import { createReadStream, createWriteStream } from 'node:fs'
-import { pipeline } from 'node:stream/promises'
-import { parse, stringify } from '@scotttrinh/jsonlines'
+import { createReadStream, createWriteStream } from "node:fs";
+import { pipeline } from "node:stream/promises";
+import { parse, stringify } from "@scotttrinh/jsonlines";
 
 await pipeline(
-  createReadStream('input.jsonl'),
+  createReadStream("input.jsonl"),
   parse({ maxLineBytes: 8 * 1024 * 1024 }),
   stringify(),
-  createWriteStream('output.jsonl'),
-)
+  createWriteStream("output.jsonl"),
+);
 ```
 
 `parse<T>()` types async iteration, `read()` and `on('data')` listeners. `T`
@@ -32,10 +32,10 @@ describes the expected JSON and does not perform schema validation. The exported
 `Parser<T>` and `Stringifier` classes accept the same options as their factories.
 
 ```ts
-const parser = parse<{ id: number }>({ emitInvalidLines: true })
-parser.on('data', (record) => console.log(record.id))
-parser.on('invalid-line', (error) => console.error(error.line, error.source))
-await pipeline(createReadStream('input.jsonl'), parser)
+const parser = parse<{ id: number }>({ emitInvalidLines: true });
+parser.on("data", (record) => console.log(record.id));
+parser.on("invalid-line", (error) => console.error(error.line, error.source));
+await pipeline(createReadStream("input.jsonl"), parser);
 ```
 
 Node object streams reserve `null` for EOF: `parse()` rejects JSON `null`, and
@@ -50,19 +50,15 @@ It yields parsed values, including `null`. Breaking iteration closes the source.
 and yields compact JSON strings with a trailing LF.
 
 ```ts
-import { parseValues, stringifyValues } from '@scotttrinh/jsonlines'
+import { parseValues, stringifyValues } from "@scotttrinh/jsonlines";
 
-for await (const record of parseValues<{ id: number } | null>(
-  createReadStream('input.jsonl'),
-  { maxLineBytes: 8 * 1024 * 1024 },
-)) {
-  console.log(record?.id)
+for await (const record of parseValues<{ id: number } | null>(createReadStream("input.jsonl"), {
+  maxLineBytes: 8 * 1024 * 1024,
+})) {
+  console.log(record?.id);
 }
 
-await pipeline(
-  stringifyValues([{ id: 1 }, null, { id: 2 }]),
-  createWriteStream('output.jsonl'),
-)
+await pipeline(stringifyValues([{ id: 1 }, null, { id: 2 }]), createWriteStream("output.jsonl"));
 ```
 
 ## Options and errors
@@ -112,6 +108,10 @@ FC_RUNS=1000 npm test
 FC_SEED=123 FC_PATH=0 node --test \
   --test-name-pattern='parsing is independent' test/streams.test.js
 ```
+
+Use `npm run lint` for Oxlint with type-aware rules and `npm run format` for
+Oxfmt. Both use their default rules and formatting options. `npm run check` runs
+these checks alongside TypeScript and the tests.
 
 TypeScript is pinned to **7.0.2**. CI covers Node 22, 24 and 26.
 See [benchmarks](bench/README.md) for running throughput and memory comparisons.

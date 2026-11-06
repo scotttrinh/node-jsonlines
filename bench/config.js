@@ -1,8 +1,8 @@
 export function configuration(values = {}) {
-  const quick = values.quick ?? false
+  const quick = values.quick ?? false;
   const config = {
     quick,
-    baseline: values.baseline ?? 'jsonlines-legacy',
+    baseline: values.baseline ?? "jsonlines-legacy",
     processes: Number(values.processes ?? (quick ? 1 : 7)),
     records: Number(values.records ?? (quick ? 1000 : 10000)),
     time: Number(values.time ?? (quick ? 100 : 3000)),
@@ -14,24 +14,17 @@ export function configuration(values = {}) {
     stabilityPercent: 5,
     memoryRecords: Number(values.memoryRecords ?? (quick ? 1000 : 300000)),
     seed: Number(values.seed ?? 0x5eed),
-  }
-  if (typeof config.baseline !== 'string' || !config.baseline.length)
-    throw new Error('baseline must be a module specifier')
+  };
+  if (typeof config.baseline !== "string" || !config.baseline.length)
+    throw new Error("baseline must be a module specifier");
   for (const [name, value] of Object.entries(config)) {
-    if (
-      typeof value === 'number' &&
-      (!Number.isSafeInteger(value) || value < 1)
-    ) {
-      throw new Error(`${name} must be a positive safe integer`)
+    if (typeof value === "number" && (!Number.isSafeInteger(value) || value < 1)) {
+      throw new Error(`${name} must be a positive safe integer`);
     }
   }
-  if (config.warmupWindows < 3)
-    throw new Error('At least three warmup windows are required')
-  if (config.thresholdPercent >= 100)
-    throw new Error('thresholdPercent must be less than 100')
+  if (config.warmupWindows < 3) throw new Error("At least three warmup windows are required");
+  if (config.thresholdPercent >= 100) throw new Error("thresholdPercent must be less than 100");
   if (!quick && config.processes < 3)
-    throw new Error(
-      'Use at least three process pairs, or --quick for a smoke test',
-    )
-  return config
+    throw new Error("Use at least three process pairs, or --quick for a smoke test");
+  return config;
 }

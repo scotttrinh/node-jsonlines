@@ -32,24 +32,20 @@ const critical95 = [
   2.0484071418,
   2.04522964213,
   2.0422724563,
-]
+];
 
 export function statistics(values) {
   if (values.length === 0 || values.some((v) => !Number.isFinite(v))) {
-    throw new Error('Statistics require finite samples')
+    throw new Error("Statistics require finite samples");
   }
-  const n = values.length
-  const mean = values.reduce((sum, value) => sum + value, 0) / n
-  const sorted = [...values].sort((a, b) => a - b)
-  const middle = Math.floor(n / 2)
-  const median =
-    n % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2
+  const n = values.length;
+  const mean = values.reduce((sum, value) => sum + value, 0) / n;
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(n / 2);
+  const median = n % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
   const sd =
-    n < 2
-      ? null
-      : Math.sqrt(values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / (n - 1))
-  const margin =
-    sd === null ? null : (critical95[Math.min(n - 1, 30)] * sd) / Math.sqrt(n)
+    n < 2 ? null : Math.sqrt(values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / (n - 1));
+  const margin = sd === null ? null : (critical95[Math.min(n - 1, 30)] * sd) / Math.sqrt(n);
   return {
     n,
     mean,
@@ -59,27 +55,25 @@ export function statistics(values) {
     ci95: margin === null ? null : [mean - margin, mean + margin],
     min: sorted[0],
     max: sorted.at(-1),
-  }
+  };
 }
 
 /** The independent unit is a fresh-process pair, never an inner iteration. */
 export function comparison(pairs, thresholdPercent, smokeOnly = false) {
   const ratios = pairs.map(({ modern, legacy }) => {
-    if (modern <= 0 || legacy <= 0)
-      throw new Error('Latencies must be positive')
-    return Math.log(legacy / modern)
-  })
-  const log = statistics(ratios)
-  const ratio = Math.exp(log.mean)
-  const ci95 = log.ci95?.map(Math.exp) ?? null
-  const threshold = thresholdPercent / 100
-  let verdict = 'inconclusive'
-  if (smokeOnly || pairs.length < 3) verdict = 'smoke-only'
-  else if (pairs.some((pair) => !pair.stable)) verdict = 'inconclusive-warmup'
-  else if (ci95[0] > 1 + threshold) verdict = 'meaningfully-faster'
-  else if (ci95[1] < 1 - threshold) verdict = 'meaningfully-slower'
-  else if (ci95[0] >= 1 - threshold && ci95[1] <= 1 + threshold)
-    verdict = 'within-practical-band'
+    if (modern <= 0 || legacy <= 0) throw new Error("Latencies must be positive");
+    return Math.log(legacy / modern);
+  });
+  const log = statistics(ratios);
+  const ratio = Math.exp(log.mean);
+  const ci95 = log.ci95?.map(Math.exp) ?? null;
+  const threshold = thresholdPercent / 100;
+  let verdict = "inconclusive";
+  if (smokeOnly || pairs.length < 3) verdict = "smoke-only";
+  else if (pairs.some((pair) => !pair.stable)) verdict = "inconclusive-warmup";
+  else if (ci95[0] > 1 + threshold) verdict = "meaningfully-faster";
+  else if (ci95[1] < 1 - threshold) verdict = "meaningfully-slower";
+  else if (ci95[0] >= 1 - threshold && ci95[1] <= 1 + threshold) verdict = "within-practical-band";
   return {
     pairs: pairs.length,
     ratio,
@@ -88,5 +82,5 @@ export function comparison(pairs, thresholdPercent, smokeOnly = false) {
     thresholdPercent,
     verdict,
     logRatio: log,
-  }
+  };
 }
