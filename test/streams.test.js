@@ -4,6 +4,7 @@ import { Readable, Writable } from 'node:stream'
 import { finished, pipeline } from 'node:stream/promises'
 import { setImmediate } from 'node:timers/promises'
 import { test } from 'node:test'
+import fc from 'fast-check'
 import {
   JsonLineError,
   parse,
@@ -12,11 +13,60 @@ import {
   stringifyValues,
 } from '../dist/index.js'
 
-async function collect(chunks, options) {
+fc.configureGlobal({
+  numRuns: Number(process.env.FC_RUNS ?? 100),
+  ...(process.env.FC_SEED === undefined
+    ? {}
+    : { seed: Number(process.env.FC_SEED) }),
+  ...(process.env.FC_PATH === undefined ? {} : { path: process.env.FC_PATH }),
+})
+
+const textUnit = fc.oneof(
+  fc.constantFrom(
+    'é',
+    '日本語',
+    '🦄',
+    '\n',
+    '\r',
+    '\t',
+    '"',
+    '\\',
+    '\ud800',
+    '\udfff',
+    '\0',
+  ),
+  fc.string({ unit: 'binary', minLength: 1, maxLength: 1 }),
+)
+const jsonValue = fc.jsonValue({ maxDepth: 3, stringUnit: textUnit })
+// Node reserves top-level null for EOF; nested null is still valid.
+const streamValue = jsonValue.filter((value) => value !== null)
+const chunkSizes = fc.array(fc.integer({ min: 1, max: 128 }), {
+  minLength: 1,
+  maxLength: 12,
+})
+const lineEnding = fc.constantFrom('\n', '\r\n')
+const blankLines = fc
+  .array(lineEnding, { maxLength: 3 })
+  .map((lines) => lines.join(''))
+const normalize = (value) => JSON.parse(JSON.stringify(value))
+
+function* fragment(bytes, sizes) {
+  let offset = 0
+  for (let i = 0; offset < bytes.length; i++) {
+    const end = Math.min(bytes.length, offset + sizes[i % sizes.length])
+    yield bytes.subarray(offset, end)
+    offset = end
+  }
+}
+
+async function collect(chunks, options, invalidLines) {
+  const decoder = parse(options)
+  if (invalidLines)
+    decoder.on('invalid-line', (error) => invalidLines.push(error))
   const values = []
   await pipeline(
     Readable.from(chunks, { objectMode: false }),
-    parse(options),
+    decoder,
     new Writable({
       objectMode: true,
       write(value, _, callback) {
@@ -28,66 +78,108 @@ async function collect(chunks, options) {
   return values
 }
 
-test('parses Unicode, CRLF, empty lines and a final unterminated record at every byte boundary', async () => {
-  const expected = [
-    { text: 'café 🦄 日本語' },
-    false,
-    0,
-    '',
-    [1, 2],
-    { last: true },
-  ]
-  const input = Buffer.from(
-    '\n\r\n' + expected.map(JSON.stringify).join('\r\n\n'),
+test('parsing is independent of UTF-8 chunk boundaries and line layout', async () => {
+  await fc.assert(
+    fc.asyncProperty(
+      fc.array(streamValue, { maxLength: 20 }),
+      lineEnding,
+      blankLines,
+      fc.boolean(),
+      chunkSizes,
+      async (values, ending, padding, terminated, sizes) => {
+        const input = Buffer.from(
+          padding +
+            values.map(JSON.stringify).join(ending + padding) +
+            (values.length && terminated ? ending : ''),
+        )
+        const expected = values.map(normalize)
+        assert.deepEqual(await collect(fragment(input, sizes)), expected)
+        assert.deepEqual(
+          await Array.fromAsync(parseValues(fragment(input, sizes))),
+          expected,
+        )
+      },
+    ),
+    {
+      examples: [
+        [
+          [{ text: 'café 🦄 日本語' }, false, 0, '', [1, null]],
+          '\r\n',
+          '\n\r\n',
+          false,
+          [1],
+        ],
+        [[], '\n', '', false, [1]],
+      ],
+    },
   )
-  for (let split = 0; split <= input.length; split++) {
-    assert.deepEqual(
-      await collect([input.subarray(0, split), input.subarray(split)]),
-      expected,
-      `split at byte ${split}`,
-    )
-  }
-  assert.deepEqual(
-    await collect(Array.from(input, (byte) => Buffer.from([byte]))),
-    expected,
-  )
-  assert.deepEqual(await collect([]), [])
 })
 
-test('round trips an object stream into real bytes and back', async () => {
-  const values = [{ message: 'hello\nworld' }, false, 42, '', ['🐈']]
-  const output = []
+test('stream sides use bytes and objects in the expected directions', () => {
   const encoder = stringify()
   assert.equal(encoder.readableObjectMode, false)
   assert.equal(encoder.writableObjectMode, true)
   const decoder = parse()
   assert.equal(decoder.readableObjectMode, true)
   assert.equal(decoder.writableObjectMode, false)
-  await pipeline(
-    Readable.from(values),
-    encoder,
-    decoder,
-    new Writable({
-      objectMode: true,
-      write(value, _, callback) {
-        output.push(value)
-        callback()
-      },
-    }),
-  )
-  assert.deepEqual(output, values)
+  encoder.destroy()
+  decoder.destroy()
 })
 
-test('reports malformed records with source, cause and physical line number', async () => {
-  for (const suffix of ['', '\n']) {
-    await assert.rejects(collect(['\ntrue\n{broken}' + suffix]), (error) => {
-      assert.ok(error instanceof JsonLineError)
-      assert.ok(error.cause instanceof SyntaxError)
-      assert.equal(error.source, '{broken}')
-      assert.equal(error.line, 3)
-      return true
-    })
-  }
+test('malformed records retain their source and physical line across fragmentation', async () => {
+  const validLine = fc.oneof(
+    fc
+      .tuple(streamValue, fc.boolean())
+      .map(([value, cr]) => JSON.stringify(value) + (cr ? '\r' : '')),
+    fc.constantFrom('', '\r'),
+  )
+  const malformed = fc.oneof(
+    fc.constantFrom(' ', '\t', '{', '[1,]', '"unterminated', '\ufeff1'),
+    streamValue.map((value) => JSON.stringify(value) + '!'),
+  )
+  await fc.assert(
+    fc.asyncProperty(
+      fc.array(validLine, { maxLength: 10 }),
+      fc
+        .tuple(malformed, fc.boolean())
+        .map(([source, cr]) => source + (cr ? '\r' : '')),
+      fc.array(validLine, { maxLength: 10 }),
+      fc.boolean(),
+      chunkSizes,
+      async (before, source, after, terminated, sizes) => {
+        const input = Buffer.from(
+          [...before, source, ...after].join('\n') + (terminated ? '\n' : ''),
+        )
+        const checkError = (error) => {
+          assert.ok(error instanceof JsonLineError)
+          assert.ok(error.cause instanceof SyntaxError)
+          assert.equal(error.code, 'ERR_JSONLINES_PARSE')
+          assert.equal(error.source, source)
+          assert.equal(error.line, before.length + 1)
+          return true
+        }
+        await assert.rejects(collect(fragment(input, sizes)), checkError)
+        await assert.rejects(
+          Array.fromAsync(parseValues(fragment(input, sizes))),
+          checkError,
+        )
+        const errors = []
+        const expected = [...before, ...after]
+          .filter((line) => line !== '' && line !== '\r')
+          .map((line) => JSON.parse(line))
+        assert.deepEqual(
+          await collect(
+            fragment(input, sizes),
+            { emitInvalidLines: true },
+            errors,
+          ),
+          expected,
+        )
+        assert.equal(errors.length, 1)
+        checkError(errors[0])
+      },
+    ),
+  )
 })
 
 test('can skip invalid records, including an invalid final record', async () => {
@@ -106,23 +198,57 @@ test('can skip invalid records, including an invalid final record', async () => 
   )
 })
 
-test('limits UTF-8 line bytes for complete and fragmented records', async () => {
-  assert.deepEqual(await collect(['"é"\n'], { maxLineBytes: 4 }), ['é'])
-  for (const chunks of [['\n"é"\n'], ['\n"', 'é', '"']]) {
-    await assert.rejects(collect(chunks, { maxLineBytes: 3 }), {
-      code: 'ERR_JSONLINES_MAX_LINE',
-      line: 2,
-    })
-  }
+test('line limits accept the exact UTF-8 byte length and reject one byte less', async () => {
+  await fc.assert(
+    fc.asyncProperty(
+      fc.string({ unit: textUnit, maxLength: 80 }),
+      fc.integer({ min: 0, max: 8 }),
+      lineEnding,
+      fc.boolean(),
+      chunkSizes,
+      async (value, blanks, ending, terminated, sizes) => {
+        const source = JSON.stringify(value) + (ending === '\r\n' ? '\r' : '')
+        const bytes = Buffer.byteLength(source)
+        const input = Buffer.from(
+          ending.repeat(blanks) + source + (terminated ? '\n' : ''),
+        )
+        assert.deepEqual(
+          await collect(fragment(input, sizes), { maxLineBytes: bytes }),
+          [value],
+        )
+        assert.deepEqual(
+          await Array.fromAsync(
+            parseValues(fragment(input, sizes), { maxLineBytes: bytes }),
+          ),
+          [value],
+        )
+        const error = { code: 'ERR_JSONLINES_MAX_LINE', line: blanks + 1 }
+        await assert.rejects(
+          collect(fragment(input, sizes), {
+            maxLineBytes: bytes - 1,
+            emitInvalidLines: true,
+          }),
+          error,
+        )
+        await assert.rejects(
+          Array.fromAsync(
+            parseValues(fragment(input, sizes), { maxLineBytes: bytes - 1 }),
+          ),
+          error,
+        )
+      },
+    ),
+    { examples: [['é🦄', 2, '\r\n', false, [1]]] },
+  )
+})
+
+test('validates line limits and treats oversized invalid JSON as terminal', async () => {
   for (const maxLineBytes of [0, -1, NaN, 1.5]) {
     assert.throws(() => parse({ maxLineBytes }), RangeError)
   }
-  // A limit is terminal even when malformed JSON is otherwise skipped.
   await assert.rejects(
-    collect(['1234'], { maxLineBytes: 3, emitInvalidLines: true }),
-    {
-      code: 'ERR_JSONLINES_MAX_LINE',
-    },
+    collect(['broken'], { maxLineBytes: 3, emitInvalidLines: true }),
+    { code: 'ERR_JSONLINES_MAX_LINE' },
   )
 })
 
@@ -269,24 +395,60 @@ test('JSON null fails explicitly in object streams instead of silently ending th
   })
 })
 
-test('serializes compact newline-terminated JSON and rejects unrepresentable values', async () => {
-  const values = [{ text: 'é\n' }, false, 0, '']
-  const output = []
-  await pipeline(
-    Readable.from(values),
-    stringify(),
-    new Writable({
-      write(chunk, _, callback) {
-        assert.ok(Buffer.isBuffer(chunk))
-        output.push(chunk)
-        callback()
+test('serialization matches native JSON bytes regardless of batching and backpressure', async () => {
+  await fc.assert(
+    fc.asyncProperty(
+      fc.array(streamValue, { maxLength: 100 }),
+      fc.oneof(
+        fc.constantFrom(0, 1, 4096, 65536),
+        fc.integer({ min: 0, max: 65536 }),
+      ),
+      fc.constantFrom(0, 1, 4, 16),
+      async (values, batchBytes, highWaterMark) => {
+        const output = []
+        await pipeline(
+          Readable.from(values),
+          stringify({ batchBytes, readableHighWaterMark: highWaterMark }),
+          new Writable({
+            highWaterMark: 1,
+            write(chunk, _, callback) {
+              output.push(chunk)
+              setImmediate().then(() => callback(), callback)
+            },
+          }),
+        )
+        const expected = Buffer.from(
+          values.map((value) => JSON.stringify(value) + '\n').join(''),
+        )
+        assert.ok(output.every(Buffer.isBuffer))
+        assert.deepEqual(Buffer.concat(output), expected)
+        assert.deepEqual(await collect(output), values.map(normalize))
+        for (const chunk of output) {
+          const lines = chunk.toString('utf8').split('\n')
+          assert.equal(lines.at(-1), '')
+          assert.ok(lines.length - 1 <= 64)
+          if (batchBytes > 0 && chunk.length > batchBytes)
+            assert.equal(lines.length, 2)
+        }
       },
-    }),
+    ),
+    {
+      examples: [
+        [
+          Array.from({ length: 129 }, (_, id) => ({
+            id,
+            text: 'é🦄\ud800\n\"\\',
+          })),
+          4096,
+          1,
+        ],
+        [[false, 0, '', [null]], 0, 0],
+      ],
+    },
   )
-  assert.equal(
-    Buffer.concat(output).toString(),
-    values.map((v) => JSON.stringify(v) + '\n').join(''),
-  )
+})
+
+test('rejects values without a JSON representation', async () => {
   const circular = {}
   circular.self = circular
   for (const value of [
@@ -365,28 +527,33 @@ test('batches output with slow consumers and flushes sparse writes without waiti
   }
 })
 
-test('iterable APIs round trip every JSON value, including null, over Web Streams', async () => {
-  const values = [null, true, 0, '', { text: '🧑‍🚀' }, [null]]
-  const encoded = await Array.fromAsync(stringifyValues(values))
-  const bytes = Buffer.from(encoded.join(''))
-  const web = new ReadableStream({
-    start(controller) {
-      for (let i = 0; i < bytes.length; i++)
-        controller.enqueue(bytes.subarray(i, i + 1))
-      controller.close()
-    },
-  })
-  assert.deepEqual(await Array.fromAsync(parseValues(web)), values)
-  assert.deepEqual(await Array.fromAsync(parseValues(['\r\nnull\n1'])), [
-    null,
-    1,
-  ])
-  await assert.rejects(Array.fromAsync(parseValues(['bad'])), JsonLineError)
-  await assert.rejects(
-    Array.fromAsync(parseValues(['123'], { maxLineBytes: 2 })),
-    {
-      code: 'ERR_JSONLINES_MAX_LINE',
-    },
+test('iterable APIs preserve JSON values including null through fragmented Web Streams', async () => {
+  await fc.assert(
+    fc.asyncProperty(
+      fc.array(jsonValue, { maxLength: 20 }),
+      chunkSizes,
+      async (generated, sizes) => {
+        const values = [null, ...generated]
+        const encoded = await Array.fromAsync(stringifyValues(values))
+        assert.deepEqual(
+          encoded,
+          values.map((value) => JSON.stringify(value) + '\n'),
+        )
+        const bytes = Buffer.from(encoded.join(''))
+        const web = new ReadableStream({
+          start(controller) {
+            for (const chunk of fragment(bytes, sizes))
+              controller.enqueue(chunk)
+            controller.close()
+          },
+        })
+        assert.deepEqual(
+          await Array.fromAsync(parseValues(web)),
+          values.map(normalize),
+        )
+      },
+    ),
+    { examples: [[['🧑‍🚀', false, 0, '', [null]], [1]]] },
   )
 })
 

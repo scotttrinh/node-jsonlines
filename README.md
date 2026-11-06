@@ -103,5 +103,15 @@ npm run check
 npm run bench:quick
 ```
 
+Stream properties use fast-check with 100 runs each. Set `FC_RUNS`
+for larger runs. Failures report a minimized counterexample, seed and shrink
+path; use `FC_SEED`, `FC_PATH` and the matching test name to replay:
+
+```sh
+FC_RUNS=1000 npm test
+FC_SEED=123 FC_PATH=0 node --test \
+  --test-name-pattern='parsing is independent' test/streams.test.js
+```
+
 TypeScript is pinned to **7.0.2**. CI covers Node 22, 24 and 26.
 See [benchmarks](bench/README.md) for running throughput and memory comparisons.
